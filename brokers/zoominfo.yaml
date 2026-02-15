@@ -1,0 +1,38 @@
+slug: zoominfo
+name: ZoomInfo
+url: https://www.zoominfo.com
+category: data_aggregator
+priority: high
+data_types:
+  - name
+  - email
+  - phone
+  - employer
+  - job_title
+opt_out:
+  methods:
+    - type: form
+      url: https://privacyrequest.zoominfo.com/remove/verify
+      steps:
+        - action: goto
+          url: https://privacyrequest.zoominfo.com/remove/verify
+        - action: fill
+          selector: "input[name=first_name]"
+          field: first_name
+        - action: fill
+          selector: "input[name=last_name]"
+          field: last_name
+        - action: fill
+          selector: "input[name=email]"
+          field: email
+        - action: click
+          selector: "button[type=submit]"
+        - action: screenshot
+          name: zoominfo_submission
+  verification:
+    type: check_listing
+    check_url: https://www.zoominfo.com
+    expected_days: 14
+  reappearance:
+    frequency_days: 90
+notes: "Major B2B data aggregator. Requires email verification to complete opt-out."

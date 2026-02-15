@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  body { font-family: 'Georgia', 'Times New Roman', serif; font-size: 14px; line-height: 1.7; color: #1a1a1a; max-width: 680px; margin: 0 auto; padding: 24px; }
+  .date-block { text-align: right; margin-bottom: 28px; color: #333; }
+  .addressee { margin-bottom: 24px; line-height: 1.5; }
+  .re-block { margin-bottom: 24px; padding: 12px 0; border-top: 1px solid #ccc; border-bottom: 1px solid #ccc; }
+  .re-block p { margin: 2px 0; }
+  .salutation { margin-top: 20px; margin-bottom: 16px; }
+  .legal-bases { margin: 16px 0; padding-left: 28px; }
+  .legal-bases li { margin-bottom: 6px; }
+  .grounds { margin: 16px 0; padding-left: 28px; }
+  .grounds li { margin-bottom: 10px; }
+  .requests { margin: 16px 0; padding-left: 28px; }
+  .requests li { margin-bottom: 12px; }
+  .info-block { border: 1px solid #d0d0d0; padding: 14px 18px; margin: 24px 0; }
+  .info-block table { border-collapse: collapse; width: 100%; }
+  .info-block td { padding: 4px 12px 4px 0; vertical-align: top; }
+  .info-label { font-weight: bold; white-space: nowrap; width: 160px; }
+  .signature { margin-top: 36px; }
+  .cc-block { margin-top: 28px; font-size: 13px; color: #555; border-top: 1px solid #ddd; padding-top: 12px; }
+  .footer { margin-top: 20px; font-size: 11px; color: #888; }
+  .sent-via { font-size: 12px; color: #666; font-style: italic; margin-bottom: 24px; }
+</style>
+</head>
+<body>
+
+<div class="date-block">
+  {{ date }}
+</div>
+
+<div class="addressee">
+  {{ broker_name }}<br>
+  Data Protection Officer / Privacy Compliance Department<br>
+</div>
+
+<div class="sent-via">Sent via electronic mail</div>
+
+<div class="re-block">
+  <p><strong>Re: Request for Erasure of Personal Data</strong></p>
+  <p>Pursuant to the General Data Protection Regulation (EU) 2016/679 and Applicable International Privacy Frameworks</p>
+  <p>Reference: {{ request_id }}</p>
+</div>
+
+<p class="salutation">Dear Data Protection Officer or Authorized Representative,</p>
+
+<p>I am writing to formally exercise my rights as a data subject under the General Data Protection Regulation (GDPR), Regulation (EU) 2016/679 of the European Parliament and of the Council, as well as all applicable international data protection frameworks. This letter constitutes a formal request for the erasure of all personal data your organization holds, processes, or controls pertaining to my identity.</p>
+
+<p>This request is made pursuant to, but not limited to, the following legal bases:</p>
+
+<ol class="legal-bases">
+  <li><strong>GDPR Article 17</strong> &mdash; Right to Erasure (&ldquo;Right to Be Forgotten&rdquo;);</li>
+  <li><strong>GDPR Article 21</strong> &mdash; Right to Object to Processing;</li>
+  <li><strong>GDPR Article 7(3)</strong> &mdash; Right to Withdraw Consent;</li>
+  <li><strong>GDPR Article 19</strong> &mdash; Notification Obligation Regarding Rectification or Erasure;</li>
+  <li><strong>UK Data Protection Act 2018</strong>, Part 3, Section 47 (Right to Erasure);</li>
+  <li><strong>California Consumer Privacy Act (CCPA)</strong>, Cal. Civ. Code &sect; 1798.105, as applicable;</li>
+  <li><strong>The Privacy Act 1988 (Australia)</strong>, Australian Privacy Principle 13;</li>
+  <li><strong>Canada&rsquo;s PIPEDA</strong>, Principle 4.3.8.</li>
+</ol>
+
+<p>Under Article 17(1) of the GDPR, I assert the following grounds for erasure:</p>
+
+<ol class="grounds" type="a">
+  <li>My personal data is no longer necessary in relation to the purposes for which it was collected or otherwise processed;</li>
+  <li>I hereby withdraw any consent previously given for the processing of my personal data, where consent was the lawful basis under Article 6(1)(a) or Article 9(2)(a);</li>
+  <li>I object to the processing pursuant to Article 21(1), and there are no overriding legitimate grounds for continued processing;</li>
+  <li>My personal data has been processed without a valid legal basis under Article 6(1);</li>
+  <li>My personal data was collected or processed through the aggregation of publicly available information without my informed consent.</li>
+</ol>
+
+<p>Pursuant to the above-cited authorities, I respectfully request that your organization take the following actions:</p>
+
+<ol class="requests" type="i">
+  <li><strong>Erase</strong> all personal data you hold about me, in any form, including but not limited to: databases, data warehouses, backups, logs, marketing lists, analytics systems, and any derived or inferred data;</li>
+  <li><strong>Notify</strong> all third parties, recipients, processors, and sub-processors to whom you have disclosed my personal data about this erasure request, as required by Article 19 of the GDPR;</li>
+  <li><strong>Cease</strong> all processing, profiling, automated decision-making, sale, sharing, and dissemination of my personal data, effective immediately;</li>
+  <li><strong>Confirm</strong> in writing the completion of erasure within one calendar month, as required by Article 12(3) of the GDPR.</li>
+</ol>
+
+<div class="info-block">
+  <strong>Data Subject Identifying Information</strong>
+  <table>
+    <tr><td class="info-label">Full Legal Name:</td><td>{{ full_name }}</td></tr>
+    <tr><td class="info-label">Email Address:</td><td>{{ email }}</td></tr>
+    {% if phone %}<tr><td class="info-label">Telephone:</td><td>{{ phone }}</td></tr>{% endif %}
+    {% if address %}<tr><td class="info-label">Mailing Address:</td><td>{{ address }}</td></tr>{% endif %}
+  </table>
+</div>
+
+<p>Should you require additional information to verify my identity as the data subject, please contact me at the email address provided above. I am happy to provide any reasonable documentation necessary to confirm my identity.</p>
+
+<p>I appreciate your prompt attention to this matter and look forward to receiving written confirmation of compliance within the one-month period prescribed by Article 12(3) of the GDPR. Please note that I reserve all rights afforded to me under applicable law, including the right to lodge a complaint with a supervisory authority under Article 77 and the right to an effective judicial remedy under Article 79.</p>
+
+<div class="signature">
+  <p>Respectfully yours,</p>
+  <p>
+    <strong>{{ full_name }}</strong><br>
+    {{ email }}{% if phone %}<br>{{ phone }}{% endif %}
+  </p>
+</div>
+
+<div class="cc-block">
+  cc: Relevant Data Protection Supervisory Authority<br>
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Federal Trade Commission, Consumer Response Center<br>
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Office of the State Attorney General
+</div>
+
+<div class="footer">
+  Ref: {{ request_id }} &nbsp;&bull;&nbsp; This communication constitutes a formal legal request under the General Data Protection Regulation (EU) 2016/679 and applicable international data protection legislation.
+</div>
+
+</body>
+</html>

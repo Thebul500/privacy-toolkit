@@ -1,0 +1,37 @@
+slug: idcrawl
+name: IDCrawl
+url: https://www.idcrawl.com
+category: people_search
+priority: medium
+data_types:
+  - name
+  - phone
+  - email
+  - social_media
+opt_out:
+  methods:
+    - type: form
+      url: https://www.idcrawl.com/opt-out
+      steps:
+        - action: goto
+          url: https://www.idcrawl.com/opt-out
+        - action: fill
+          selector: "input[name=first_name]"
+          field: first_name
+        - action: fill
+          selector: "input[name=last_name]"
+          field: last_name
+        - action: fill
+          selector: "input[name=email]"
+          field: email
+        - action: click
+          selector: "button[type=submit]"
+        - action: screenshot
+          name: idcrawl_submission
+  verification:
+    type: check_listing
+    check_url: https://www.idcrawl.com
+    expected_days: 7
+  reappearance:
+    frequency_days: 90
+notes: "Aggregates social media profiles and public data. Includes username searches."

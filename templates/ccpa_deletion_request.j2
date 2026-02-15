@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  body { font-family: 'Georgia', 'Times New Roman', serif; font-size: 14px; line-height: 1.7; color: #1a1a1a; max-width: 680px; margin: 0 auto; padding: 24px; }
+  .date-block { text-align: right; margin-bottom: 28px; color: #333; }
+  .addressee { margin-bottom: 24px; line-height: 1.5; }
+  .re-block { margin-bottom: 24px; padding: 12px 0; border-top: 1px solid #ccc; border-bottom: 1px solid #ccc; }
+  .re-block p { margin: 2px 0; }
+  .salutation { margin-top: 20px; margin-bottom: 16px; }
+  .statutes { margin: 16px 0; padding-left: 28px; }
+  .statutes li { margin-bottom: 6px; }
+  .requests { margin: 16px 0; padding-left: 28px; }
+  .requests li { margin-bottom: 12px; }
+  .info-block { border: 1px solid #d0d0d0; padding: 14px 18px; margin: 24px 0; }
+  .info-block table { border-collapse: collapse; width: 100%; }
+  .info-block td { padding: 4px 12px 4px 0; vertical-align: top; }
+  .info-label { font-weight: bold; white-space: nowrap; width: 160px; }
+  .signature { margin-top: 36px; }
+  .cc-block { margin-top: 28px; font-size: 13px; color: #555; border-top: 1px solid #ddd; padding-top: 12px; }
+  .footer { margin-top: 20px; font-size: 11px; color: #888; }
+  .sent-via { font-size: 12px; color: #666; font-style: italic; margin-bottom: 24px; }
+</style>
+</head>
+<body>
+
+<div class="date-block">
+  {{ date }}
+</div>
+
+<div class="addressee">
+  {{ broker_name }}<br>
+  Data Privacy / Compliance Department<br>
+</div>
+
+<div class="sent-via">Sent via electronic mail</div>
+
+<div class="re-block">
+  <p><strong>Re: Request for Deletion of Personal Information</strong></p>
+  <p>Pursuant to the California Consumer Privacy Act and Applicable Federal and State Privacy Laws</p>
+  <p>Reference: {{ request_id }}</p>
+</div>
+
+<p class="salutation">Dear Data Privacy Officer or Authorized Representative,</p>
+
+<p>I am writing to formally exercise my rights under applicable United States federal and state privacy and consumer protection laws. This letter constitutes a verified consumer request for the deletion of all personal information, personally identifiable information (PII), and consumer records your organization has collected, purchased, received, sold, shared, or otherwise processed pertaining to my identity.</p>
+
+<p>This request is made pursuant to, but not limited to, the following statutes:</p>
+
+<ol class="statutes">
+  <li><strong>California Consumer Privacy Act (CCPA)</strong>, Cal. Civ. Code &sect; 1798.100 <em>et seq.</em>, as amended by the <strong>California Privacy Rights Act (CPRA)</strong> of 2020;</li>
+  <li><strong>California Online Privacy Protection Act (CalOPPA)</strong>, Bus. &amp; Prof. Code &sect; 22575;</li>
+  <li><strong>Virginia Consumer Data Protection Act (VCDPA)</strong>, Va. Code &sect; 59.1-575 <em>et seq.</em>;</li>
+  <li><strong>Colorado Privacy Act (CPA)</strong>, Colo. Rev. Stat. &sect; 6-1-1301 <em>et seq.</em>;</li>
+  <li><strong>Connecticut Data Privacy Act (CTDPA)</strong>, Conn. Gen. Stat. &sect; 42-515 <em>et seq.</em>;</li>
+  <li><strong>Texas Data Privacy and Security Act (TDPSA)</strong>, Tex. Bus. &amp; Com. Code &sect; 541;</li>
+  <li><strong>Oregon Consumer Privacy Act (OCPA)</strong>, ORS &sect; 646A.570 <em>et seq.</em>;</li>
+  <li><strong>Fair Credit Reporting Act (FCRA)</strong>, 15 U.S.C. &sect; 1681 <em>et seq.</em>;</li>
+  <li><strong>Federal Trade Commission Act</strong>, Section 5, 15 U.S.C. &sect; 45.</li>
+</ol>
+
+<p>Pursuant to the above-cited authorities, I respectfully request that your organization take the following actions:</p>
+
+<ol class="requests" type="a">
+  <li><strong>Delete</strong> all personal information, records, profiles, data compilations, and any derivatives thereof that you maintain about me, in any format, whether collected directly or obtained from third-party sources;</li>
+  <li><strong>Direct</strong> all service providers, contractors, data brokers, affiliates, and third parties with whom you have shared, sold, or disclosed my personal information to likewise delete all such data;</li>
+  <li><strong>Cease</strong> the sale, sharing, licensing, or other dissemination of my personal information, effective immediately;</li>
+  <li><strong>Confirm</strong> in writing the completion of these actions within the time periods mandated by applicable law (45 calendar days under the CCPA/CPRA; 45 days under VCDPA, CPA, and CTDPA).</li>
+</ol>
+
+<div class="info-block">
+  <strong>Identifying Information</strong>
+  <table>
+    <tr><td class="info-label">Full Legal Name:</td><td>{{ full_name }}</td></tr>
+    <tr><td class="info-label">Email Address:</td><td>{{ email }}</td></tr>
+    {% if phone %}<tr><td class="info-label">Telephone:</td><td>{{ phone }}</td></tr>{% endif %}
+    {% if address %}<tr><td class="info-label">Mailing Address:</td><td>{{ address }}</td></tr>{% endif %}
+  </table>
+</div>
+
+<p>Should you require additional verification of my identity to process this request, please contact me at the email address provided above. I am happy to provide any reasonable documentation necessary to confirm my identity as the data subject.</p>
+
+<p>I appreciate your prompt attention to this matter and look forward to receiving written confirmation of compliance within the statutory timeframe. Please note that I reserve all rights afforded to me under the above-cited statutes, including the right to file a complaint with the appropriate regulatory authority in the event of non-compliance.</p>
+
+<div class="signature">
+  <p>Respectfully yours,</p>
+  <p>
+    <strong>{{ full_name }}</strong><br>
+    {{ email }}{% if phone %}<br>{{ phone }}{% endif %}
+  </p>
+</div>
+
+<div class="cc-block">
+  cc: Federal Trade Commission, Consumer Response Center<br>
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;California Privacy Protection Agency<br>
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Office of the State Attorney General
+</div>
+
+<div class="footer">
+  Ref: {{ request_id }} &nbsp;&bull;&nbsp; This communication constitutes a formal legal request under applicable U.S. federal and state privacy laws.
+</div>
+
+</body>
+</html>

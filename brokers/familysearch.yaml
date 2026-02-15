@@ -1,0 +1,36 @@
+slug: familysearch
+name: FamilySearch
+url: https://www.familysearch.org
+category: genealogy
+priority: medium
+data_types:
+  - name
+  - address
+  - family_records
+opt_out:
+  methods:
+    - type: form
+      url: https://submit-irm.trustarc.com/services/validation/b8d6e704-e5b1-42a0-9f86-bbdec35939a1
+      steps:
+        - action: goto
+          url: https://submit-irm.trustarc.com/services/validation/b8d6e704-e5b1-42a0-9f86-bbdec35939a1
+        - action: fill
+          selector: "input[name=first_name]"
+          field: first_name
+        - action: fill
+          selector: "input[name=last_name]"
+          field: last_name
+        - action: fill
+          selector: "input[name=email]"
+          field: email
+        - action: click
+          selector: "button[type=submit]"
+        - action: screenshot
+          name: familysearch_submission
+  verification:
+    type: check_listing
+    check_url: https://www.familysearch.org
+    expected_days: 30
+  reappearance:
+    frequency_days: 180
+notes: "Non-profit genealogy service operated by LDS Church. Uses TrustArc privacy portal."

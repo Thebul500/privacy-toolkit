@@ -1,0 +1,39 @@
+slug: lexisnexis
+name: LexisNexis
+url: https://www.lexisnexis.com
+category: data_aggregator
+priority: critical
+data_types:
+  - name
+  - address
+  - phone
+  - email
+  - criminal_records
+  - court_records
+opt_out:
+  methods:
+    - type: form
+      url: https://optout.lexisnexis.com/
+      steps:
+        - action: goto
+          url: https://optout.lexisnexis.com/
+        - action: fill
+          selector: "input[name=first_name]"
+          field: first_name
+        - action: fill
+          selector: "input[name=last_name]"
+          field: last_name
+        - action: fill
+          selector: "input[name=email]"
+          field: email
+        - action: click
+          selector: "button[type=submit]"
+        - action: screenshot
+          name: lexisnexis_submission
+  verification:
+    type: check_listing
+    check_url: https://www.lexisnexis.com
+    expected_days: 30
+  reappearance:
+    frequency_days: 180
+notes: "Major data aggregator for legal and business purposes. Extensive public records and background data."

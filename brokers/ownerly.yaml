@@ -1,0 +1,40 @@
+slug: ownerly
+name: Ownerly
+url: https://www.ownerly.com
+category: public_records
+priority: medium
+data_types:
+  - name
+  - address
+  - property_records
+opt_out:
+  methods:
+    - type: email
+      address: privacy@ownerly.com
+      template: ccpa_deletion_request
+      subject: ""
+    - type: form
+      url: https://www.ownerly.com/privacy
+      steps:
+        - action: goto
+          url: https://www.ownerly.com/privacy
+        - action: fill
+          selector: "input[name=first_name]"
+          field: first_name
+        - action: fill
+          selector: "input[name=last_name]"
+          field: last_name
+        - action: fill
+          selector: "input[name=email]"
+          field: email
+        - action: click
+          selector: "button[type=submit]"
+        - action: screenshot
+          name: ownerly_submission
+  verification:
+    type: check_listing
+    check_url: https://www.ownerly.com
+    expected_days: 14
+  reappearance:
+    frequency_days: 90
+notes: "Property data broker focused on homeowner information."

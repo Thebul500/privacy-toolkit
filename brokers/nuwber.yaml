@@ -1,0 +1,33 @@
+slug: nuwber
+name: Nuwber
+url: https://nuwber.com
+category: people_search
+priority: critical
+data_types:
+  - name
+  - phone
+  - email
+  - address
+opt_out:
+  methods:
+    - type: form
+      url: https://nuwber.com/removal/link
+      steps:
+        - action: goto
+          url: https://nuwber.com/removal/link
+        - action: fill
+          selector: "input[name='profile_url']"
+          field: "profile_url"
+        - action: fill
+          selector: "input[name='email']"
+          field: "email"
+        - action: click
+          selector: "button[type='submit']"
+        - action: screenshot
+          name: "nuwber_submission"
+  verification:
+    type: check_listing
+    expected_days: 7
+  reappearance:
+    frequency_days: 90
+notes: ""

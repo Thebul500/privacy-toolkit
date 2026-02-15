@@ -1,0 +1,36 @@
+slug: centeda
+name: Centeda
+url: https://centeda.com
+category: people_search
+priority: low
+data_types:
+  - name
+  - phone
+  - address
+opt_out:
+  methods:
+    - type: form
+      url: https://centeda.com/ng/control/privacy
+      steps:
+        - action: goto
+          url: https://centeda.com/ng/control/privacy
+        - action: fill
+          selector: "input[name=first_name]"
+          field: first_name
+        - action: fill
+          selector: "input[name=last_name]"
+          field: last_name
+        - action: fill
+          selector: "input[name=email]"
+          field: email
+        - action: click
+          selector: "button[type=submit]"
+        - action: screenshot
+          name: centeda_submission
+  verification:
+    type: check_listing
+    check_url: https://centeda.com
+    expected_days: 7
+  reappearance:
+    frequency_days: 90
+notes: "Uses privacy control portal similar to Dataveria."

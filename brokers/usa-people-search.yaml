@@ -1,0 +1,36 @@
+slug: usa-people-search
+name: USA People Search
+url: https://www.usa-people-search.com
+category: people_search
+priority: medium
+data_types:
+  - name
+  - phone
+  - address
+opt_out:
+  methods:
+    - type: form
+      url: https://www.usa-people-search.com/removal
+      steps:
+        - action: goto
+          url: https://www.usa-people-search.com/removal
+        - action: fill
+          selector: "input[name=first_name]"
+          field: first_name
+        - action: fill
+          selector: "input[name=last_name]"
+          field: last_name
+        - action: fill
+          selector: "input[name=email]"
+          field: email
+        - action: click
+          selector: "button[type=submit]"
+        - action: screenshot
+          name: usa_people_search_submission
+  verification:
+    type: check_listing
+    check_url: https://www.usa-people-search.com
+    expected_days: 7
+  reappearance:
+    frequency_days: 90
+notes: "People search directory with dedicated removal page."

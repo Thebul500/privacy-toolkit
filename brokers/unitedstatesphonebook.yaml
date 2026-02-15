@@ -1,0 +1,36 @@
+slug: unitedstatesphonebook
+name: United States Phone Book
+url: https://www.unitedstatesphonebook.com
+category: people_search
+priority: medium
+data_types:
+  - name
+  - phone
+  - address
+opt_out:
+  methods:
+    - type: form
+      url: https://www.unitedstatesphonebook.com/contact.php
+      steps:
+        - action: goto
+          url: https://www.unitedstatesphonebook.com/contact.php
+        - action: fill
+          selector: "input[name=first_name]"
+          field: first_name
+        - action: fill
+          selector: "input[name=last_name]"
+          field: last_name
+        - action: fill
+          selector: "input[name=email]"
+          field: email
+        - action: click
+          selector: "button[type=submit]"
+        - action: screenshot
+          name: unitedstatesphonebook_submission
+  verification:
+    type: check_listing
+    check_url: https://www.unitedstatesphonebook.com
+    expected_days: 14
+  reappearance:
+    frequency_days: 90
+notes: "Phone directory service. Contact form-based removal process."

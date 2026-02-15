@@ -1,0 +1,47 @@
+/* Privacy Toolkit - Custom CSS overrides */
+
+/* Nav link styling */
+.nav-link {
+    color: #94a3b8;
+}
+.nav-link:hover {
+    color: #e2e8f0;
+    background-color: #1e293b;
+}
+.nav-link.active {
+    color: #ffffff;
+    background-color: #334155;
+}
+
+/* Smooth HTMX transitions */
+.htmx-swapping {
+    opacity: 0.5;
+    transition: opacity 200ms ease-in;
+}
+.htmx-settling {
+    opacity: 1;
+    transition: opacity 200ms ease-out;
+}
+
+/* Scrollbar styling for dark theme */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+::-webkit-scrollbar-track {
+    background: #0d1117;
+}
+::-webkit-scrollbar-thumb {
+    background: #334155;
+    border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: #475569;
+}
+
+/* Table row truncation */
+.truncate {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}

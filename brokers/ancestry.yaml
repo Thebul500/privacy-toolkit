@@ -1,0 +1,41 @@
+slug: ancestry
+name: Ancestry.com
+url: https://www.ancestry.com
+category: genealogy
+priority: high
+data_types:
+  - name
+  - address
+  - email
+  - family_records
+opt_out:
+  methods:
+    - type: form
+      url: https://support.ancestry.com/s/reportissue
+      steps:
+        - action: goto
+          url: https://support.ancestry.com/s/reportissue
+        - action: fill
+          selector: "input[name=first_name]"
+          field: first_name
+        - action: fill
+          selector: "input[name=last_name]"
+          field: last_name
+        - action: fill
+          selector: "input[name=email]"
+          field: email
+        - action: click
+          selector: "button[type=submit]"
+        - action: screenshot
+          name: ancestry_submission
+    - type: email
+      address: privacy@ancestry.com
+      template: ccpa_deletion_request
+      subject: ""
+  verification:
+    type: check_listing
+    check_url: https://www.ancestry.com
+    expected_days: 30
+  reappearance:
+    frequency_days: 180
+notes: "Major genealogy platform with extensive family records. May require account verification."

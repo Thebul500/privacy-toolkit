@@ -1,0 +1,33 @@
+slug: unmask
+name: Unmask
+url: https://www.unmask.com
+category: people_search
+priority: high
+data_types:
+  - name
+  - phone
+  - email
+  - address
+opt_out:
+  methods:
+    - type: form
+      url: https://unmask.com/opt-out
+      steps:
+        - action: goto
+          url: https://unmask.com/opt-out
+        - action: fill
+          selector: "input[name='first_name'], #firstName"
+          field: first_name
+        - action: fill
+          selector: "input[name='last_name'], #lastName"
+          field: last_name
+        - action: click
+          selector: "button[type='submit'], .submit-btn"
+        - action: screenshot
+          name: "unmask_submission"
+  verification:
+    type: check_listing
+    expected_days: 7
+  reappearance:
+    frequency_days: 90
+notes: ""

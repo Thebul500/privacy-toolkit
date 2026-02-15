@@ -1,0 +1,36 @@
+slug: officialusa
+name: OfficialUSA
+url: https://www.officialusa.com
+category: people_search
+priority: low
+data_types:
+  - name
+  - phone
+  - address
+opt_out:
+  methods:
+    - type: form
+      url: https://www.officialusa.com/optout/
+      steps:
+        - action: goto
+          url: https://www.officialusa.com/optout/
+        - action: fill
+          selector: "input[name=first_name]"
+          field: first_name
+        - action: fill
+          selector: "input[name=last_name]"
+          field: last_name
+        - action: fill
+          selector: "input[name=email]"
+          field: email
+        - action: click
+          selector: "button[type=submit]"
+        - action: screenshot
+          name: officialusa_submission
+  verification:
+    type: check_listing
+    check_url: https://www.officialusa.com
+    expected_days: 7
+  reappearance:
+    frequency_days: 90
+notes: "Public records directory with dedicated opt-out page."

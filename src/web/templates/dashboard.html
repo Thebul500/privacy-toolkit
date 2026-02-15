@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+{% block title %}Dashboard - Privacy Toolkit{% endblock %}
+
+{% block content %}
+<div class="mb-6">
+    <h2 class="text-2xl font-bold text-white">Dashboard</h2>
+    <p class="text-dark-300 text-sm mt-1">Overview of your privacy protection status</p>
+</div>
+
+<!-- Stats Cards -->
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+    <div class="bg-dark-700 rounded-lg p-4 border border-dark-600">
+        <div class="text-dark-300 text-xs font-medium uppercase tracking-wide">Profiles</div>
+        <div class="text-2xl font-bold text-white mt-1">{{ stats.profiles }}</div>
+    </div>
+    <div class="bg-dark-700 rounded-lg p-4 border border-dark-600">
+        <div class="text-dark-300 text-xs font-medium uppercase tracking-wide">Total Findings</div>
+        <div class="text-2xl font-bold text-red-400 mt-1">{{ stats.findings }}</div>
+    </div>
+    <div class="bg-dark-700 rounded-lg p-4 border border-dark-600">
+        <div class="text-dark-300 text-xs font-medium uppercase tracking-wide">Removals Sent</div>
+        <div class="text-2xl font-bold text-yellow-400 mt-1">{{ stats.removals_submitted }}</div>
+    </div>
+    <div class="bg-dark-700 rounded-lg p-4 border border-dark-600">
+        <div class="text-dark-300 text-xs font-medium uppercase tracking-wide">Confirmed Removed</div>
+        <div class="text-2xl font-bold text-green-400 mt-1">{{ stats.removals_confirmed }}</div>
+    </div>
+</div>
+
+<!-- Removal status breakdown -->
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+    <div class="bg-dark-700 rounded-lg border border-dark-600 p-5">
+        <h3 class="text-sm font-semibold text-white mb-3">Removal Status Breakdown</h3>
+        <div class="space-y-2">
+            {% for status, count in stats.removal_breakdown.items() %}
+            <div class="flex justify-between items-center">
+                <span class="text-sm">
+                    {% if status == 'pending' %}<span class="inline-block w-2 h-2 rounded-full bg-gray-400 mr-2"></span>
+                    {% elif status == 'submitted' %}<span class="inline-block w-2 h-2 rounded-full bg-yellow-400 mr-2"></span>
+                    {% elif status == 'confirmed' %}<span class="inline-block w-2 h-2 rounded-full bg-green-400 mr-2"></span>
+                    {% elif status == 'reappeared' %}<span class="inline-block w-2 h-2 rounded-full bg-red-400 mr-2"></span>
+                    {% else %}<span class="inline-block w-2 h-2 rounded-full bg-dark-300 mr-2"></span>
+                    {% endif %}
+                    {{ status|capitalize }}
+                </span>
+                <span class="text-sm font-mono text-dark-200">{{ count }}</span>
+            </div>
+            {% endfor %}
+            {% if not stats.removal_breakdown %}
+            <p class="text-dark-300 text-sm">No removal requests yet.</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="bg-dark-700 rounded-lg border border-dark-600 p-5">
+        <h3 class="text-sm font-semibold text-white mb-3">Quick Actions</h3>
+        <div class="space-y-2">
+            {% if stats.profile_names %}
+            {% for name in stats.profile_names %}
+            <form method="post" action="/scans/trigger" class="inline">
+                <input type="hidden" name="profile" value="{{ name }}">
+                <button type="submit" class="w-full text-left px-3 py-2 bg-dark-600 hover:bg-dark-500 rounded text-sm transition-colors">
+                    Run full scan for <span class="font-semibold text-white">{{ name }}</span>
+                </button>
+            </form>
+            {% endfor %}
+            {% else %}
+            <p class="text-dark-300 text-sm">Create a profile to start scanning.</p>
+            <a href="/profiles" class="inline-block mt-2 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 rounded text-sm text-white transition-colors">Create Profile</a>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Recent Activity -->
+<div class="bg-dark-700 rounded-lg border border-dark-600">
+    <div class="px-5 py-3 border-b border-dark-600">
+        <h3 class="text-sm font-semibold text-white">Recent Activity</h3>
+    </div>
+    <div class="divide-y divide-dark-600">
+        {% for entry in recent_activity %}
+        <div class="px-5 py-3 flex justify-between items-center">
+            <div>
+                <span class="text-sm text-dark-100">{{ entry.action }}</span>
+                {% if entry.profile %}
+                <span class="text-xs text-dark-300 ml-2">{{ entry.profile }}</span>
+                {% endif %}
+            </div>
+            <span class="text-xs text-dark-300 font-mono">{{ entry.timestamp[:16] }}</span>
+        </div>
+        {% endfor %}
+        {% if not recent_activity %}
+        <div class="px-5 py-8 text-center text-dark-300 text-sm">No activity yet. Run a scan to get started.</div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Active Tasks -->
+{% if active_tasks %}
+<div class="mt-6 bg-dark-700 rounded-lg border border-dark-600">
+    <div class="px-5 py-3 border-b border-dark-600">
+        <h3 class="text-sm font-semibold text-white">Running Tasks</h3>
+    </div>
+    <div class="divide-y divide-dark-600">
+        {% for task in active_tasks %}
+        <div class="px-5 py-3 flex justify-between items-center"
+             hx-get="/scans/status/{{ task.id }}" hx-trigger="every 3s" hx-swap="outerHTML">
+            <div class="flex items-center gap-2">
+                <svg class="w-4 h-4 text-blue-400 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                </svg>
+                <span class="text-sm">{{ task.name }}</span>
+            </div>
+            <span class="text-xs px-2 py-0.5 rounded bg-blue-900 text-blue-300">running</span>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+{% endblock %}

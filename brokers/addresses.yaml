@@ -1,0 +1,36 @@
+slug: addresses
+name: Addresses.com
+url: https://www.addresses.com
+category: people_search
+priority: medium
+data_types:
+  - name
+  - phone
+  - address
+opt_out:
+  methods:
+    - type: form
+      url: https://suppression.peopleconnect.us/login
+      steps:
+        - action: goto
+          url: https://suppression.peopleconnect.us/login
+        - action: fill
+          selector: "input[name=first_name]"
+          field: first_name
+        - action: fill
+          selector: "input[name=last_name]"
+          field: last_name
+        - action: fill
+          selector: "input[name=email]"
+          field: email
+        - action: click
+          selector: "button[type=submit]"
+        - action: screenshot
+          name: addresses_submission
+  verification:
+    type: check_listing
+    check_url: https://www.addresses.com
+    expected_days: 7
+  reappearance:
+    frequency_days: 90
+notes: "Owned by Intelius. Uses PeopleConnect suppression portal."
