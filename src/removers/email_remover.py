@@ -35,7 +35,7 @@ class EmailRemover:
     def __init__(self, smtp_config: SmtpConfig, db: Database):
         self.smtp = smtp_config
         self.db = db
-        self.env = Environment(loader=FileSystemLoader(str(TEMPLATES_DIR)))
+        self.env = Environment(loader=FileSystemLoader(str(TEMPLATES_DIR)), autoescape=True)
 
     def _gather_evidence(self, broker: Broker, profile: Profile) -> dict:
         """Look up scan findings for this broker to include in the email."""
