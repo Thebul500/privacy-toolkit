@@ -31,4 +31,5 @@ RUN mkdir -p config/profiles data/logs data/scans data/screenshots
 
 EXPOSE 8080
 
+USER non-root
 CMD ["python", "-m", "src"]
