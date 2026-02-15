@@ -1,6 +1,7 @@
 slug: beenverified
 name: BeenVerified
 url: https://www.beenverified.com
+privacy_policy_url: https://www.beenverified.com/privacy
 category: people_search
 priority: critical
 data_types:

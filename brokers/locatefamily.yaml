@@ -1,6 +1,7 @@
 slug: locatefamily
 name: LocateFamily
 url: https://www.locatefamily.com
+privacy_policy_url: https://www.locatefamily.com/privacy-policy.html
 category: people_search
 priority: low
 data_types:

@@ -1,6 +1,7 @@
 slug: publicdatausa
 name: PublicDataUSA
 url: https://www.publicdatausa.com
+privacy_policy_url: https://www.publicdatausa.com/privacy
 category: people_search
 priority: critical
 data_types:

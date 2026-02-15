@@ -191,6 +191,30 @@ class Database:
             results.append(d)
         return results
 
+    def get_findings_for_broker(self, profile: str, broker_slug: str) -> list[dict]:
+        """Get findings matching a specific broker slug for a profile."""
+        conn = self._connect()
+        rows = conn.execute(
+            """SELECT * FROM findings
+            WHERE profile=? AND (
+                site_name LIKE ? OR
+                details LIKE ?
+            )
+            ORDER BY id DESC""",
+            (profile, f"%{broker_slug}%", f"%{broker_slug}%"),
+        ).fetchall()
+        conn.close()
+        results = []
+        for r in rows:
+            d = dict(r)
+            if d.get("details"):
+                try:
+                    d["details"] = json.loads(d["details"])
+                except (json.JSONDecodeError, TypeError):
+                    pass
+            results.append(d)
+        return results
+
     def get_findings_count(self, profile: Optional[str] = None) -> int:
         conn = self._connect()
         if profile:
@@ -260,6 +284,20 @@ class Database:
             params.append(status)
         query += " ORDER BY id DESC"
         rows = conn.execute(query, params).fetchall()
+        conn.close()
+        return [dict(r) for r in rows]
+
+    def get_overdue_removals(self, days: int = 45) -> list[dict]:
+        """Get submitted removals older than N days with no confirmation (need follow-up)."""
+        cutoff = (datetime.now() - timedelta(days=days)).isoformat()
+        conn = self._connect()
+        rows = conn.execute(
+            """SELECT * FROM removal_requests
+            WHERE status='submitted' AND submitted_at <= ?
+            AND notes NOT LIKE '%follow_up_sent%'
+            ORDER BY submitted_at ASC""",
+            (cutoff,),
+        ).fetchall()
         conn.close()
         return [dict(r) for r in rows]
 

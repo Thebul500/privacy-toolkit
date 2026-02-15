@@ -13,6 +13,11 @@
   .statutes li { margin-bottom: 6px; }
   .requests { margin: 16px 0; padding-left: 28px; }
   .requests li { margin-bottom: 12px; }
+  .evidence-block { border: 1px solid #d0d0d0; padding: 14px 18px; margin: 24px 0; background: #fafafa; }
+  .evidence-block ul { margin: 8px 0; padding-left: 20px; }
+  .evidence-block li { margin-bottom: 4px; font-size: 13px; }
+  .evidence-block a { color: #1a56db; }
+  .policy-note { font-size: 13px; color: #444; margin: 16px 0; padding: 10px 16px; border-left: 3px solid #1a56db; background: #f0f4ff; }
   .info-block { border: 1px solid #d0d0d0; padding: 14px 18px; margin: 24px 0; }
   .info-block table { border-collapse: collapse; width: 100%; }
   .info-block td { padding: 4px 12px 4px 0; vertical-align: top; }
@@ -68,6 +73,26 @@
   <li><strong>Cease</strong> the sale, sharing, licensing, or other dissemination of my personal information, effective immediately;</li>
   <li><strong>Confirm</strong> in writing the completion of these actions within the time periods mandated by applicable law (45 calendar days under the CCPA/CPRA; 45 days under VCDPA, CPA, and CTDPA).</li>
 </ol>
+
+{% if listing_urls %}
+<div class="evidence-block">
+  <strong>Documented Exposure</strong>
+  <p style="margin: 8px 0 4px 0; font-size: 13px;">I have identified the following listing(s) on your platform containing my personal information:</p>
+  <ul>
+    {% for url in listing_urls %}<li><a href="{{ url }}">{{ url }}</a></li>{% endfor %}
+  </ul>
+</div>
+{% endif %}
+
+{% if data_types_found %}
+<p>Specifically, the following categories of personal data are being publicly displayed or processed by your organization: <strong>{{ data_types_found | join(', ') }}</strong>.</p>
+{% endif %}
+
+{% if privacy_policy_url %}
+<div class="policy-note">
+  I have reviewed your organization's privacy policy at <a href="{{ privacy_policy_url }}">{{ privacy_policy_url }}</a> and am exercising the rights described therein, in addition to the statutory rights cited above.
+</div>
+{% endif %}
 
 <div class="info-block">
   <strong>Identifying Information</strong>

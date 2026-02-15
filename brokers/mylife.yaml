@@ -1,6 +1,7 @@
 slug: mylife
 name: MyLife
 url: https://www.mylife.com
+privacy_policy_url: https://www.mylife.com/privacy-policy
 category: people_search
 priority: critical
 data_types:

@@ -1,6 +1,7 @@
 slug: intelius
 name: Intelius
 url: https://www.intelius.com
+privacy_policy_url: https://www.intelius.com/privacy
 category: people_search
 priority: critical
 data_types:

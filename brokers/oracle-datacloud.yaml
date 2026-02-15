@@ -1,6 +1,7 @@
 slug: oracle-datacloud
 name: Oracle Data Cloud
 url: https://www.oracle.com/cx/advertising/
+privacy_policy_url: https://www.oracle.com/legal/privacy/
 category: data_aggregator
 priority: high
 data_types:

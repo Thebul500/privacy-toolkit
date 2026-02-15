@@ -307,3 +307,35 @@ def run_form_removal(profile_name: str, broker_slug: str, config, db) -> dict:
 
     db.log("form_removal", profile_name, {"broker": broker_slug, "success": result.get("success")})
     return result
+
+
+def run_follow_ups(config, db) -> dict:
+    """Check for overdue removals and send follow-up emails."""
+    from src.config import load_broker, load_profile
+    from src.removers.email_remover import EmailRemover
+
+    overdue = db.get_overdue_removals(days=45)
+    if not overdue:
+        logger.info("No overdue removals needing follow-up")
+        return {"sent": 0, "checked": 0}
+
+    remover = EmailRemover(config.smtp, db)
+    sent = 0
+    errors = []
+
+    for removal in overdue:
+        try:
+            profile = load_profile(removal["profile"])
+            broker = load_broker(removal["broker_slug"])
+            result = remover.send_follow_up(removal, profile, broker)
+            if result.get("success"):
+                sent += 1
+                logger.info("Follow-up sent for %s -> %s", removal["profile"], removal["broker_slug"])
+            else:
+                errors.append(f"{removal['broker_slug']}: {result.get('error')}")
+        except Exception as e:
+            errors.append(f"{removal['broker_slug']}: {e}")
+            logger.error("Follow-up failed for %s: %s", removal["broker_slug"], e)
+
+    db.log("follow_ups_sent", None, {"sent": sent, "checked": len(overdue), "errors": errors})
+    return {"sent": sent, "checked": len(overdue), "errors": errors}
