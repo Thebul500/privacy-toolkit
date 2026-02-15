@@ -1,0 +1,37 @@
+slug: corelogic
+name: CoreLogic
+url: https://www.corelogic.com
+category: data_aggregator
+priority: high
+data_types:
+  - name
+  - address
+  - property_records
+  - financial_data
+opt_out:
+  methods:
+    - type: form
+      url: https://www.corelogic.com/privacy/consumer-data-opt-out-form/
+      steps:
+        - action: goto
+          url: https://www.corelogic.com/privacy/consumer-data-opt-out-form/
+        - action: fill
+          selector: "input[name=first_name]"
+          field: first_name
+        - action: fill
+          selector: "input[name=last_name]"
+          field: last_name
+        - action: fill
+          selector: "input[name=email]"
+          field: email
+        - action: click
+          selector: "button[type=submit]"
+        - action: screenshot
+          name: corelogic_submission
+  verification:
+    type: check_listing
+    check_url: https://www.corelogic.com
+    expected_days: 30
+  reappearance:
+    frequency_days: 180
+notes: "Major property data broker with extensive real estate and financial information."

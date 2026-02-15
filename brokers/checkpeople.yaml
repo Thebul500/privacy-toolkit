@@ -1,0 +1,33 @@
+slug: checkpeople
+name: CheckPeople
+url: https://www.checkpeople.com
+category: people_search
+priority: critical
+data_types:
+  - name
+  - phone
+  - email
+  - address
+opt_out:
+  methods:
+    - type: form
+      url: https://www.checkpeople.com/opt-out
+      steps:
+        - action: goto
+          url: https://www.checkpeople.com/opt-out
+        - action: fill
+          selector: "input[name='first_name']"
+          field: "first_name"
+        - action: fill
+          selector: "input[name='last_name']"
+          field: "last_name"
+        - action: click
+          selector: "button[name='search']"
+        - action: screenshot
+          name: "checkpeople_submission"
+  verification:
+    type: check_listing
+    expected_days: 7
+  reappearance:
+    frequency_days: 90
+notes: ""

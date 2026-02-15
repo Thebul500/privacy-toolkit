@@ -1,0 +1,38 @@
+slug: experian
+name: Experian
+url: https://www.experian.com
+category: credit_bureau
+priority: high
+data_types:
+  - name
+  - address
+  - phone
+  - email
+  - credit_data
+opt_out:
+  methods:
+    - type: form
+      url: https://www.experian.com/privacy/opting_out
+      steps:
+        - action: goto
+          url: https://www.experian.com/privacy/opting_out
+        - action: fill
+          selector: "input[name=first_name]"
+          field: first_name
+        - action: fill
+          selector: "input[name=last_name]"
+          field: last_name
+        - action: fill
+          selector: "input[name=email]"
+          field: email
+        - action: click
+          selector: "button[type=submit]"
+        - action: screenshot
+          name: experian_submission
+  verification:
+    type: check_listing
+    check_url: https://www.experian.com
+    expected_days: 30
+  reappearance:
+    frequency_days: 180
+notes: "Major credit bureau that also operates as marketing data broker. Opt-out applies to marketing use only."

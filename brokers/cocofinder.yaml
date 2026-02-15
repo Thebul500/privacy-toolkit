@@ -1,0 +1,37 @@
+slug: cocofinder
+name: CocoFinder
+url: https://www.cocofinder.com
+category: people_search
+priority: medium
+data_types:
+  - name
+  - phone
+  - address
+  - email
+opt_out:
+  methods:
+    - type: form
+      url: https://www.cocofinder.com/remove-my-info
+      steps:
+        - action: goto
+          url: https://www.cocofinder.com/remove-my-info
+        - action: fill
+          selector: "input[name=first_name]"
+          field: first_name
+        - action: fill
+          selector: "input[name=last_name]"
+          field: last_name
+        - action: fill
+          selector: "input[name=email]"
+          field: email
+        - action: click
+          selector: "button[type=submit]"
+        - action: screenshot
+          name: cocofinder_submission
+  verification:
+    type: check_listing
+    check_url: https://www.cocofinder.com
+    expected_days: 7
+  reappearance:
+    frequency_days: 90
+notes: "People search engine with dedicated removal page."

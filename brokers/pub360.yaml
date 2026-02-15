@@ -1,0 +1,36 @@
+slug: pub360
+name: Pub360
+url: https://pub360.com
+category: people_search
+priority: low
+data_types:
+  - name
+  - phone
+  - address
+opt_out:
+  methods:
+    - type: form
+      url: https://pub360.com/ng/control/privacy
+      steps:
+        - action: goto
+          url: https://pub360.com/ng/control/privacy
+        - action: fill
+          selector: "input[name=first_name]"
+          field: first_name
+        - action: fill
+          selector: "input[name=last_name]"
+          field: last_name
+        - action: fill
+          selector: "input[name=email]"
+          field: email
+        - action: click
+          selector: "button[type=submit]"
+        - action: screenshot
+          name: pub360_submission
+  verification:
+    type: check_listing
+    check_url: https://pub360.com
+    expected_days: 7
+  reappearance:
+    frequency_days: 90
+notes: "Uses privacy control portal. Part of network with similar opt-out systems."

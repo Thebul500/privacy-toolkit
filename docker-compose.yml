@@ -1,0 +1,17 @@
+services:
+  privacy-toolkit:
+    build: .
+    container_name: privacy-toolkit
+    ports:
+      - "8384:8080"
+    volumes:
+      - ./data:/app/data
+      - ./config:/app/config
+      - ./brokers:/app/brokers
+      - ./templates:/app/templates
+    restart: unless-stopped
+
+networks:
+  default:
+    name: signal_default
+    external: true

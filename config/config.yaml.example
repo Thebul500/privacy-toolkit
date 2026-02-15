@@ -1,0 +1,44 @@
+# Privacy Toolkit Configuration
+# Copy this file to config.yaml and fill in your settings.
+
+web:
+  host: "0.0.0.0"
+  port: 8080
+
+smtp:
+  host: smtp.gmail.com
+  port: 587
+  use_tls: true
+  username: ""
+  password: ""              # Gmail App Password (myaccount.google.com/apppasswords)
+  from_name: "Privacy Toolkit"
+  from_email: ""
+  rate_limit: 10            # Max emails per hour
+  delay_seconds: 30         # Seconds between emails
+
+browser:
+  headless: true
+  timeout: 30000
+  screenshot_on_submit: true
+
+scheduling:
+  rescan_interval_days: 90
+  cron_time: "0 3 * * 0"   # Sunday 3 AM
+  notify_on_complete: true
+  notification_method: signal
+
+notifications:
+  signal:
+    enabled: false
+    api_url: http://signal-api:8080
+    sender: ""
+    recipients: []
+
+hibp:
+  api_key: ""               # HaveIBeenPwned API key (https://haveibeenpwned.com/API/Key)
+
+database:
+  path: data/privacy_toolkit.db
+
+logging:
+  level: INFO

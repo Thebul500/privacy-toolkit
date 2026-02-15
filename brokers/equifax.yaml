@@ -1,0 +1,38 @@
+slug: equifax
+name: Equifax
+url: https://www.equifax.com
+category: credit_bureau
+priority: high
+data_types:
+  - name
+  - address
+  - phone
+  - email
+  - credit_data
+opt_out:
+  methods:
+    - type: form
+      url: https://www.equifax.com/personal/help/information-opt-out/
+      steps:
+        - action: goto
+          url: https://www.equifax.com/personal/help/information-opt-out/
+        - action: fill
+          selector: "input[name=first_name]"
+          field: first_name
+        - action: fill
+          selector: "input[name=last_name]"
+          field: last_name
+        - action: fill
+          selector: "input[name=email]"
+          field: email
+        - action: click
+          selector: "button[type=submit]"
+        - action: screenshot
+          name: equifax_submission
+  verification:
+    type: check_listing
+    check_url: https://www.equifax.com
+    expected_days: 30
+  reappearance:
+    frequency_days: 180
+notes: "Major credit bureau. Opt-out applies to marketing and pre-screened offers."

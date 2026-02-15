@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}Brokers - Privacy Toolkit{% endblock %}
+
+{% block content %}
+<div class="mb-6">
+    <h2 class="text-2xl font-bold text-white">Data Brokers</h2>
+    <p class="text-dark-300 text-sm mt-1">{{ brokers|length }} configured broker{{ 's' if brokers|length != 1 }}</p>
+</div>
+
+<!-- Priority Filter -->
+<div class="flex gap-2 mb-4">
+    <a href="/brokers" class="px-3 py-1 rounded text-xs font-medium transition-colors {% if not filter_priority %}bg-dark-500 text-white{% else %}bg-dark-700 text-dark-300 hover:bg-dark-600{% endif %}">All</a>
+    <a href="/brokers?priority=critical" class="px-3 py-1 rounded text-xs font-medium transition-colors {% if filter_priority == 'critical' %}bg-red-900/50 text-red-300{% else %}bg-dark-700 text-dark-300 hover:bg-dark-600{% endif %}">Critical</a>
+    <a href="/brokers?priority=high" class="px-3 py-1 rounded text-xs font-medium transition-colors {% if filter_priority == 'high' %}bg-orange-900/50 text-orange-300{% else %}bg-dark-700 text-dark-300 hover:bg-dark-600{% endif %}">High</a>
+    <a href="/brokers?priority=medium" class="px-3 py-1 rounded text-xs font-medium transition-colors {% if filter_priority == 'medium' %}bg-yellow-900/50 text-yellow-300{% else %}bg-dark-700 text-dark-300 hover:bg-dark-600{% endif %}">Medium</a>
+    <a href="/brokers?priority=low" class="px-3 py-1 rounded text-xs font-medium transition-colors {% if filter_priority == 'low' %}bg-dark-500 text-dark-200{% else %}bg-dark-700 text-dark-300 hover:bg-dark-600{% endif %}">Low</a>
+</div>
+
+<div class="bg-dark-700 rounded-lg border border-dark-600">
+    {% if brokers %}
+    <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+            <thead>
+                <tr class="border-b border-dark-600 text-dark-300 text-xs uppercase">
+                    <th class="px-5 py-2 text-left">Broker</th>
+                    <th class="px-5 py-2 text-left">Category</th>
+                    <th class="px-5 py-2 text-left">Priority</th>
+                    <th class="px-5 py-2 text-left">Opt-Out Methods</th>
+                    <th class="px-5 py-2 text-left">Data Types</th>
+                    <th class="px-5 py-2 text-right">Reappearance</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-dark-600">
+                {% for b in brokers %}
+                <tr class="hover:bg-dark-600">
+                    <td class="px-5 py-2">
+                        <div class="font-medium text-white">{{ b.name }}</div>
+                        <div class="text-xs text-dark-300 font-mono">{{ b.slug }}</div>
+                    </td>
+                    <td class="px-5 py-2 text-dark-200">{{ b.category|replace('_', ' ')|title }}</td>
+                    <td class="px-5 py-2">
+                        {% if b.priority.value == 'critical' %}<span class="inline-flex items-center px-2 py-0.5 rounded text-xs bg-red-900/50 text-red-300 font-semibold">critical</span>
+                        {% elif b.priority.value == 'high' %}<span class="inline-flex items-center px-2 py-0.5 rounded text-xs bg-orange-900/50 text-orange-300">high</span>
+                        {% elif b.priority.value == 'medium' %}<span class="inline-flex items-center px-2 py-0.5 rounded text-xs bg-yellow-900/50 text-yellow-300">medium</span>
+                        {% else %}<span class="inline-flex items-center px-2 py-0.5 rounded text-xs bg-dark-500 text-dark-200">low</span>{% endif %}
+                    </td>
+                    <td class="px-5 py-2">
+                        <div class="flex flex-wrap gap-1">
+                            {% for m in b.methods %}
+                            {% if m.type.value == 'email' %}<span class="px-1.5 py-0.5 rounded text-xs bg-blue-900/50 text-blue-300">email</span>
+                            {% elif m.type.value == 'form' %}<span class="px-1.5 py-0.5 rounded text-xs bg-purple-900/50 text-purple-300">form</span>
+                            {% elif m.type.value == 'phone' %}<span class="px-1.5 py-0.5 rounded text-xs bg-green-900/50 text-green-300">phone</span>
+                            {% else %}<span class="px-1.5 py-0.5 rounded text-xs bg-dark-500 text-dark-200">{{ m.type.value }}</span>{% endif %}
+                            {% endfor %}
+                        </div>
+                    </td>
+                    <td class="px-5 py-2 text-dark-300 text-xs">{{ b.data_types|join(', ') }}</td>
+                    <td class="px-5 py-2 text-right text-dark-300 font-mono text-xs">{{ b.reappearance_days }}d</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="px-5 py-8 text-center text-dark-300 text-sm">No brokers found{% if filter_priority %} with priority "{{ filter_priority }}"{% endif %}.</div>
+    {% endif %}
+</div>
+{% endblock %}

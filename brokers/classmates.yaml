@@ -1,0 +1,24 @@
+slug: classmates
+name: Classmates.com
+url: https://www.classmates.com
+category: people_search
+priority: medium
+data_types:
+  - name
+  - email
+  - school_records
+opt_out:
+  methods:
+    - type: manual
+      instructions: "Cancel membership through account settings. Visit https://help.classmates.com/hc/en-us/articles/115002224171 for detailed instructions."
+    - type: email
+      address: support@classmates.com
+      template: ccpa_deletion_request
+      subject: ""
+  verification:
+    type: check_listing
+    check_url: https://www.classmates.com
+    expected_days: 14
+  reappearance:
+    frequency_days: 180
+notes: "Owned by Intelius. Requires account cancellation for full removal."

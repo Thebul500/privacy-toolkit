@@ -1,0 +1,33 @@
+slug: clustrmaps
+name: ClustrMaps
+url: https://clustrmaps.com
+category: people_search
+priority: critical
+data_types:
+  - name
+  - phone
+  - email
+  - address
+opt_out:
+  methods:
+    - type: form
+      url: https://clustrmaps.com/bl/opt-out
+      steps:
+        - action: goto
+          url: https://clustrmaps.com/bl/opt-out
+        - action: fill
+          selector: "input[name='full_name']"
+          field: "full_name"
+        - action: fill
+          selector: "input[name='email']"
+          field: "email"
+        - action: click
+          selector: "button[type='submit']"
+        - action: screenshot
+          name: "clustrmaps_submission"
+  verification:
+    type: check_listing
+    expected_days: 14
+  reappearance:
+    frequency_days: 90
+notes: ""

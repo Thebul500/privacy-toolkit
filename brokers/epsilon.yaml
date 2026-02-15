@@ -1,0 +1,42 @@
+slug: epsilon
+name: Epsilon Data Management
+url: https://www.epsilon.com
+category: data_aggregator
+priority: high
+data_types:
+  - name
+  - email
+  - address
+  - phone
+  - purchase_history
+opt_out:
+  methods:
+    - type: email
+      address: optout@epsilon.com
+      template: ccpa_deletion_request
+      subject: ""
+    - type: form
+      url: https://www.epsilon.com/privacy-policy
+      steps:
+        - action: goto
+          url: https://www.epsilon.com/privacy-policy
+        - action: fill
+          selector: "input[name=first_name]"
+          field: first_name
+        - action: fill
+          selector: "input[name=last_name]"
+          field: last_name
+        - action: fill
+          selector: "input[name=email]"
+          field: email
+        - action: click
+          selector: "button[type=submit]"
+        - action: screenshot
+          name: epsilon_submission
+  verification:
+    type: check_listing
+    check_url: https://www.epsilon.com
+    expected_days: 30
+  reappearance:
+    frequency_days: 180
+notes: "One of the 'big three' data brokers. Major marketing data aggregator with extensive consumer profiles."

@@ -1,0 +1,41 @@
+slug: intelius
+name: Intelius
+url: https://www.intelius.com
+category: people_search
+priority: critical
+data_types:
+  - name
+  - phone
+  - email
+  - address
+opt_out:
+  methods:
+    - type: form
+      url: https://www.intelius.com/opt-out
+      steps:
+        - action: goto
+          url: https://www.intelius.com/opt-out
+        - action: fill
+          selector: "input[name=name]"
+          field: name
+        - action: fill
+          selector: "input[name=email]"
+          field: email
+        - action: click
+          selector: "button[type=submit]"
+        - action: screenshot
+          name: intelius_submission
+    - type: email
+      address: support@mailer.intelius.com
+      template: ccpa_deletion_request
+      subject: ""
+    - type: phone
+      number: "1-888-245-1655"
+      template: ccpa_deletion_request
+  verification:
+    type: check_listing
+    check_url: https://www.intelius.com/search
+    expected_days: 14
+  reappearance:
+    frequency_days: 90
+notes: ""

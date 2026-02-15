@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+{% block title %}Removals - Privacy Toolkit{% endblock %}
+
+{% block content %}
+<div class="flex justify-between items-center mb-6">
+    <div>
+        <h2 class="text-2xl font-bold text-white">Removal Tracking</h2>
+        <p class="text-dark-300 text-sm mt-1">Track opt-out requests across data brokers</p>
+    </div>
+</div>
+
+{% if message %}
+<div class="mb-4 px-4 py-2 rounded text-sm {% if message_type == 'error' %}bg-red-900/50 text-red-300 border border-red-800{% else %}bg-blue-900/50 text-blue-300 border border-blue-800{% endif %}">
+    {{ message }}
+</div>
+{% endif %}
+
+<!-- Send Email Removals -->
+{% if profiles %}
+<div class="bg-dark-700 rounded-lg border border-dark-600 mb-6 p-5">
+    <h3 class="text-sm font-semibold text-white mb-3">Send Email Removal Requests</h3>
+    <form method="post" action="/removals/email" class="flex items-end gap-3">
+        <div>
+            <label class="block text-xs text-dark-300 mb-1">Profile</label>
+            <select name="profile" class="bg-dark-800 border border-dark-500 rounded px-3 py-1.5 text-sm text-white focus:border-blue-500 focus:outline-none">
+                {% for p in profiles %}
+                <option value="{{ p }}">{{ p }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <button type="submit" class="px-4 py-1.5 bg-yellow-600 hover:bg-yellow-500 rounded text-sm text-white font-medium transition-colors">
+            Send to All Brokers
+        </button>
+    </form>
+</div>
+{% endif %}
+
+<!-- Status Filter -->
+<div class="flex gap-2 mb-4">
+    <a href="/removals" class="px-3 py-1 rounded text-xs font-medium transition-colors {% if not filter_status %}bg-dark-500 text-white{% else %}bg-dark-700 text-dark-300 hover:bg-dark-600{% endif %}">All</a>
+    <a href="/removals?status=pending" class="px-3 py-1 rounded text-xs font-medium transition-colors {% if filter_status == 'pending' %}bg-dark-500 text-white{% else %}bg-dark-700 text-dark-300 hover:bg-dark-600{% endif %}">Pending</a>
+    <a href="/removals?status=submitted" class="px-3 py-1 rounded text-xs font-medium transition-colors {% if filter_status == 'submitted' %}bg-yellow-900/50 text-yellow-300{% else %}bg-dark-700 text-dark-300 hover:bg-dark-600{% endif %}">Submitted</a>
+    <a href="/removals?status=confirmed" class="px-3 py-1 rounded text-xs font-medium transition-colors {% if filter_status == 'confirmed' %}bg-green-900/50 text-green-300{% else %}bg-dark-700 text-dark-300 hover:bg-dark-600{% endif %}">Confirmed</a>
+    <a href="/removals?status=reappeared" class="px-3 py-1 rounded text-xs font-medium transition-colors {% if filter_status == 'reappeared' %}bg-red-900/50 text-red-300{% else %}bg-dark-700 text-dark-300 hover:bg-dark-600{% endif %}">Reappeared</a>
+</div>
+
+<!-- Removal Table -->
+<div class="bg-dark-700 rounded-lg border border-dark-600">
+    {% if removals %}
+    <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+            <thead>
+                <tr class="border-b border-dark-600 text-dark-300 text-xs uppercase">
+                    <th class="px-5 py-2 text-left">ID</th>
+                    <th class="px-5 py-2 text-left">Profile</th>
+                    <th class="px-5 py-2 text-left">Broker</th>
+                    <th class="px-5 py-2 text-left">Method</th>
+                    <th class="px-5 py-2 text-left">Status</th>
+                    <th class="px-5 py-2 text-left">Submitted</th>
+                    <th class="px-5 py-2 text-left">Recheck</th>
+                    <th class="px-5 py-2 text-right">Actions</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-dark-600">
+                {% for r in removals %}
+                <tr class="hover:bg-dark-600" id="removal-{{ r.id }}">
+                    <td class="px-5 py-2 font-mono text-dark-300">#{{ r.id }}</td>
+                    <td class="px-5 py-2">{{ r.profile }}</td>
+                    <td class="px-5 py-2 font-medium text-white">{{ r.broker_name }}</td>
+                    <td class="px-5 py-2">
+                        {% if r.method == 'email' %}<span class="text-blue-300">email</span>
+                        {% elif r.method == 'form' %}<span class="text-purple-300">form</span>
+                        {% else %}{{ r.method }}{% endif %}
+                    </td>
+                    <td class="px-5 py-2">
+                        {% if r.status == 'pending' %}<span class="inline-flex items-center px-2 py-0.5 rounded text-xs bg-gray-800 text-gray-300">pending</span>
+                        {% elif r.status == 'submitted' %}<span class="inline-flex items-center px-2 py-0.5 rounded text-xs bg-yellow-900/50 text-yellow-300">submitted</span>
+                        {% elif r.status == 'confirmed' %}<span class="inline-flex items-center px-2 py-0.5 rounded text-xs bg-green-900/50 text-green-300">confirmed</span>
+                        {% elif r.status == 'reappeared' %}<span class="inline-flex items-center px-2 py-0.5 rounded text-xs bg-red-900/50 text-red-300">reappeared</span>
+                        {% elif r.status == 'rejected' %}<span class="inline-flex items-center px-2 py-0.5 rounded text-xs bg-red-900/50 text-red-400">rejected</span>
+                        {% else %}<span class="inline-flex items-center px-2 py-0.5 rounded text-xs bg-dark-500 text-dark-200">{{ r.status }}</span>{% endif %}
+                    </td>
+                    <td class="px-5 py-2 text-dark-300 font-mono text-xs">{{ r.submitted_at[:10] if r.submitted_at else '—' }}</td>
+                    <td class="px-5 py-2 text-dark-300 font-mono text-xs">{{ r.recheck_at[:10] if r.recheck_at else '—' }}</td>
+                    <td class="px-5 py-2 text-right">
+                        {% if r.status in ('submitted', 'pending') %}
+                        <form method="post" action="/removals/{{ r.id }}/confirm" class="inline"
+                              hx-post="/removals/{{ r.id }}/confirm" hx-target="#removal-{{ r.id }}" hx-swap="outerHTML">
+                            <button type="submit" class="px-2 py-0.5 text-xs bg-green-800 hover:bg-green-700 rounded text-green-200 transition-colors">
+                                Confirm
+                            </button>
+                        </form>
+                        {% endif %}
+                        {% if r.status == 'confirmed' %}
+                        <form method="post" action="/removals/{{ r.id }}/reappeared" class="inline"
+                              hx-post="/removals/{{ r.id }}/reappeared" hx-target="#removal-{{ r.id }}" hx-swap="outerHTML">
+                            <button type="submit" class="px-2 py-0.5 text-xs bg-red-800 hover:bg-red-700 rounded text-red-200 transition-colors">
+                                Reappeared
+                            </button>
+                        </form>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="px-5 py-8 text-center text-dark-300 text-sm">No removal requests{% if filter_status %} with status "{{ filter_status }}"{% endif %}.</div>
+    {% endif %}
+</div>
+{% endblock %}
