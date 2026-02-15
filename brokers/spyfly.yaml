@@ -1,6 +1,7 @@
 slug: spyfly
 name: SpyFly
 url: https://www.spyfly.com
+privacy_policy_url: https://www.spyfly.com/privacy-policy
 category: background_check
 priority: medium
 data_types:

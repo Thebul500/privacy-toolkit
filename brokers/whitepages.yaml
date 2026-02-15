@@ -1,6 +1,7 @@
 slug: whitepages
 name: Whitepages
 url: https://www.whitepages.com
+privacy_policy_url: https://www.whitepages.com/privacy-policy
 category: people_search
 priority: critical
 data_types:

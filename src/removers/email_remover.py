@@ -37,6 +37,32 @@ class EmailRemover:
         self.db = db
         self.env = Environment(loader=FileSystemLoader(str(TEMPLATES_DIR)))
 
+    def _gather_evidence(self, broker: Broker, profile: Profile) -> dict:
+        """Look up scan findings for this broker to include in the email."""
+        findings = self.db.get_findings_for_broker(profile.name, broker.slug)
+        listing_urls = []
+        data_types_found = set()
+
+        for f in findings:
+            if f.get("site_url") and f["site_url"] not in listing_urls:
+                listing_urls.append(f["site_url"])
+            if f.get("data_type"):
+                dtype = f["data_type"].replace("listing_", "")
+                data_types_found.add(dtype)
+            details = f.get("details", {})
+            if isinstance(details, dict) and details.get("query_type"):
+                data_types_found.add(details["query_type"])
+
+        # Also include the broker's own declared data types
+        for dt in broker.data_types:
+            data_types_found.add(dt)
+
+        return {
+            "listing_urls": listing_urls[:5],  # cap at 5
+            "data_types_found": sorted(data_types_found),
+            "privacy_policy_url": broker.privacy_policy_url,
+        }
+
     def send_removal_request(
         self,
         broker: Broker,
@@ -55,6 +81,8 @@ class EmailRemover:
         except Exception:
             template = self.env.get_template("ccpa_deletion_request.j2")
 
+        evidence = self._gather_evidence(broker, profile)
+
         html_body = template.render(
             full_name=profile.full_name or f"{profile.first_name} {profile.last_name}".strip(),
             first_name=profile.first_name,
@@ -64,21 +92,27 @@ class EmailRemover:
             address=profile.primary_address,
             request_id=request_id,
             broker_name=broker.name,
+            broker_url=broker.url,
             date=time.strftime("%B %d, %Y"),
+            listing_urls=evidence["listing_urls"],
+            data_types_found=evidence["data_types_found"],
+            privacy_policy_url=evidence["privacy_policy_url"],
         )
         plain_body = _html_to_plain(html_body)
 
         subject = method.subject or f"Formal Data Deletion Request Pursuant to CCPA/GDPR \u2014 Ref: {request_id}"
         from_addr = self.smtp.from_email or self.smtp.username
         from_name = profile.full_name or f"{profile.first_name} {profile.last_name}".strip()
+        reply_to = profile.primary_email or from_addr
         message_id = f"<{request_id}@privacy-toolkit>"
 
         msg = MIMEMultipart("alternative")
         msg["From"] = f"{from_name} <{from_addr}>"
         msg["To"] = method.address
         msg["Subject"] = subject
-        msg["Reply-To"] = profile.primary_email or from_addr
+        msg["Reply-To"] = reply_to
         msg["Message-ID"] = message_id
+        msg["Disposition-Notification-To"] = reply_to
         msg.attach(MIMEText(plain_body, "plain"))
         msg.attach(MIMEText(html_body, "html"))
 
@@ -138,3 +172,94 @@ class EmailRemover:
             }, success=False)
 
         return result
+
+    def send_follow_up(
+        self,
+        removal: dict,
+        profile: Profile,
+        broker: Broker,
+    ) -> dict:
+        """Send a follow-up email for an overdue removal request."""
+        method = broker.email_method
+        if not method:
+            return {"success": False, "error": "No email opt-out method"}
+
+        original_ref = (removal.get("email_message_id") or "").strip("<>").split("@")[0]
+        follow_up_id = str(uuid.uuid4())[:8]
+
+        try:
+            template = self.env.get_template("follow_up_request.j2")
+        except Exception:
+            return {"success": False, "error": "Follow-up template not found"}
+
+        evidence = self._gather_evidence(broker, profile)
+
+        html_body = template.render(
+            full_name=profile.full_name or f"{profile.first_name} {profile.last_name}".strip(),
+            email=profile.primary_email,
+            phone=profile.primary_phone,
+            address=profile.primary_address,
+            broker_name=broker.name,
+            broker_url=broker.url,
+            original_ref=original_ref,
+            follow_up_id=follow_up_id,
+            original_date=removal.get("submitted_at", "")[:10],
+            date=time.strftime("%B %d, %Y"),
+            days_elapsed=(
+                (__import__("datetime").datetime.now() -
+                 __import__("datetime").datetime.fromisoformat(removal["submitted_at"]))
+                .days if removal.get("submitted_at") else 45
+            ),
+            listing_urls=evidence["listing_urls"],
+            data_types_found=evidence["data_types_found"],
+            privacy_policy_url=evidence["privacy_policy_url"],
+        )
+        plain_body = _html_to_plain(html_body)
+
+        subject = f"Second Request \u2014 Data Deletion Follow-Up \u2014 Original Ref: {original_ref}"
+        from_addr = self.smtp.from_email or self.smtp.username
+        from_name = profile.full_name or f"{profile.first_name} {profile.last_name}".strip()
+        reply_to = profile.primary_email or from_addr
+        message_id = f"<{follow_up_id}@privacy-toolkit>"
+
+        msg = MIMEMultipart("alternative")
+        msg["From"] = f"{from_name} <{from_addr}>"
+        msg["To"] = method.address
+        msg["Subject"] = subject
+        msg["Reply-To"] = reply_to
+        msg["Message-ID"] = message_id
+        msg["In-Reply-To"] = removal.get("email_message_id", "")
+        msg["References"] = removal.get("email_message_id", "")
+        msg["Disposition-Notification-To"] = reply_to
+        msg.attach(MIMEText(plain_body, "plain"))
+        msg.attach(MIMEText(html_body, "html"))
+
+        if not self.smtp.username or not self.smtp.password:
+            return {"success": False, "error": "SMTP not configured"}
+
+        try:
+            with smtplib.SMTP(self.smtp.host, self.smtp.port) as server:
+                if self.smtp.use_tls:
+                    server.starttls()
+                server.login(self.smtp.username, self.smtp.password)
+                server.send_message(msg)
+
+            # Mark follow-up sent in notes
+            existing_notes = removal.get("notes") or ""
+            new_notes = f"{existing_notes}; follow_up_sent:{time.strftime('%Y-%m-%d')}" if existing_notes else f"follow_up_sent:{time.strftime('%Y-%m-%d')}"
+            self.db.update_removal_status(
+                removal["id"], "submitted",
+                notes=new_notes,
+            )
+            self.db.log("follow_up_sent", removal.get("profile"), {
+                "broker": broker.slug, "original_ref": original_ref, "follow_up_id": follow_up_id,
+            })
+
+            time.sleep(self.smtp.delay_seconds)
+            return {"success": True, "follow_up_id": follow_up_id}
+
+        except Exception as e:
+            self.db.log("follow_up_failed", removal.get("profile"), {
+                "broker": broker.slug, "error": str(e),
+            }, success=False)
+            return {"success": False, "error": str(e)}

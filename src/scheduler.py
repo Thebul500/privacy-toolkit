@@ -128,6 +128,17 @@ def _scheduled_scan(profile_name: str, config: "Config", db: "Database",
     )
 
 
+def _scheduled_follow_ups(config: "Config", db: "Database",
+                          task_manager: "TaskManager") -> None:
+    """Check for overdue removals and send follow-up emails."""
+    from src.tasks import run_follow_ups
+    logger.info("Checking for overdue removal requests needing follow-up")
+    task_manager.submit(
+        "Follow-up emails",
+        run_follow_ups, config, db,
+    )
+
+
 def setup_apscheduler(config: "Config", db: "Database",
                       task_manager: "TaskManager"):
     """Create and start an APScheduler BackgroundScheduler from config.
@@ -172,6 +183,17 @@ def setup_apscheduler(config: "Config", db: "Database",
             name=f"Daily recheck: {profile_name}",
             replace_existing=True,
         )
+
+    # Daily follow-up check at 10 AM for overdue removals
+    scheduler.add_job(
+        _scheduled_follow_ups,
+        CronTrigger(hour=10, minute=0),
+        args=[config, db, task_manager],
+        id="follow_up_check",
+        name="Daily follow-up check",
+        replace_existing=True,
+    )
+    logger.info("Scheduled daily follow-up check at 10 AM")
 
     scheduler.start()
     logger.info("APScheduler started with %d job(s)", len(scheduler.get_jobs()))

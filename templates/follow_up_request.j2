@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  body { font-family: 'Georgia', 'Times New Roman', serif; font-size: 14px; line-height: 1.7; color: #1a1a1a; max-width: 680px; margin: 0 auto; padding: 24px; }
+  .date-block { text-align: right; margin-bottom: 28px; color: #333; }
+  .addressee { margin-bottom: 24px; line-height: 1.5; }
+  .re-block { margin-bottom: 24px; padding: 12px 0; border-top: 1px solid #ccc; border-bottom: 1px solid #ccc; }
+  .re-block p { margin: 2px 0; }
+  .salutation { margin-top: 20px; margin-bottom: 16px; }
+  .highlight { background: #fff3e0; border-left: 3px solid #e65100; padding: 12px 16px; margin: 20px 0; }
+  .evidence-block { border: 1px solid #d0d0d0; padding: 14px 18px; margin: 24px 0; background: #fafafa; }
+  .evidence-block ul { margin: 8px 0; padding-left: 20px; }
+  .evidence-block li { margin-bottom: 4px; font-size: 13px; }
+  .evidence-block a { color: #1a56db; }
+  .policy-note { font-size: 13px; color: #444; margin: 16px 0; padding: 10px 16px; border-left: 3px solid #1a56db; background: #f0f4ff; }
+  .info-block { border: 1px solid #d0d0d0; padding: 14px 18px; margin: 24px 0; }
+  .info-block table { border-collapse: collapse; width: 100%; }
+  .info-block td { padding: 4px 12px 4px 0; vertical-align: top; }
+  .info-label { font-weight: bold; white-space: nowrap; width: 160px; }
+  .signature { margin-top: 36px; }
+  .cc-block { margin-top: 28px; font-size: 13px; color: #555; border-top: 1px solid #ddd; padding-top: 12px; }
+  .footer { margin-top: 20px; font-size: 11px; color: #888; }
+  .sent-via { font-size: 12px; color: #666; font-style: italic; margin-bottom: 24px; }
+</style>
+</head>
+<body>
+
+<div class="date-block">
+  {{ date }}
+</div>
+
+<div class="addressee">
+  {{ broker_name }}<br>
+  Data Privacy / Compliance Department<br>
+</div>
+
+<div class="sent-via">Sent via electronic mail</div>
+
+<div class="re-block">
+  <p><strong>Re: Second Request — Data Deletion Follow-Up</strong></p>
+  <p>Original Request Reference: {{ original_ref }} (submitted {{ original_date }})</p>
+  <p>Follow-Up Reference: {{ follow_up_id }}</p>
+</div>
+
+<p class="salutation">Dear Data Privacy Officer or Authorized Representative,</p>
+
+<p>I am writing to follow up on my original data deletion request submitted on <strong>{{ original_date }}</strong> under Reference <strong>{{ original_ref }}</strong>. As of this date, <strong>{{ days_elapsed }} days have elapsed</strong> since my initial request, and I have not received written confirmation that my personal information has been deleted as required by law.</p>
+
+<div class="highlight">
+  <strong>Statutory Deadline Exceeded:</strong> Under the California Consumer Privacy Act (CCPA/CPRA), your organization is required to respond to a verified consumer deletion request within <strong>45 calendar days</strong>. The statutory deadline for my original request has passed without a response.
+</div>
+
+<p>I respectfully reiterate my request that your organization:</p>
+
+<ol style="padding-left: 28px;">
+  <li style="margin-bottom: 10px;"><strong>Delete</strong> all personal information you maintain about me, including any data obtained from third-party sources;</li>
+  <li style="margin-bottom: 10px;"><strong>Direct</strong> all service providers and third parties to delete my data;</li>
+  <li style="margin-bottom: 10px;"><strong>Cease</strong> the sale or sharing of my personal information;</li>
+  <li style="margin-bottom: 10px;"><strong>Confirm</strong> in writing the completion of these actions without further delay.</li>
+</ol>
+
+{% if listing_urls %}
+<div class="evidence-block">
+  <strong>Current Exposure</strong>
+  <p style="margin: 8px 0 4px 0; font-size: 13px;">As of this date, the following listing(s) containing my personal information remain publicly accessible on your platform:</p>
+  <ul>
+    {% for url in listing_urls %}<li><a href="{{ url }}">{{ url }}</a></li>{% endfor %}
+  </ul>
+</div>
+{% endif %}
+
+{% if data_types_found %}
+<p>The following categories of my personal data continue to be exposed: <strong>{{ data_types_found | join(', ') }}</strong>.</p>
+{% endif %}
+
+{% if privacy_policy_url %}
+<div class="policy-note">
+  Your organization's own privacy policy at <a href="{{ privacy_policy_url }}">{{ privacy_policy_url }}</a> provides for the exercise of these rights. This follow-up is consistent with the procedures described therein.
+</div>
+{% endif %}
+
+<div class="info-block">
+  <strong>Identifying Information</strong>
+  <table>
+    <tr><td class="info-label">Full Legal Name:</td><td>{{ full_name }}</td></tr>
+    <tr><td class="info-label">Email Address:</td><td>{{ email }}</td></tr>
+    {% if phone %}<tr><td class="info-label">Telephone:</td><td>{{ phone }}</td></tr>{% endif %}
+    {% if address %}<tr><td class="info-label">Mailing Address:</td><td>{{ address }}</td></tr>{% endif %}
+  </table>
+</div>
+
+<p>I appreciate your attention to this matter and request an acknowledgment of receipt at your earliest convenience. Should I not receive confirmation of compliance, I may exercise my right to file a formal complaint with the California Privacy Protection Agency, the Federal Trade Commission, and the applicable state attorney general.</p>
+
+<p>Should you require additional verification of my identity, please contact me at the email address provided above.</p>
+
+<div class="signature">
+  <p>Respectfully yours,</p>
+  <p>
+    <strong>{{ full_name }}</strong><br>
+    {{ email }}{% if phone %}<br>{{ phone }}{% endif %}
+  </p>
+</div>
+
+<div class="cc-block">
+  cc: Federal Trade Commission, Consumer Response Center<br>
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;California Privacy Protection Agency<br>
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Office of the State Attorney General
+</div>
+
+<div class="footer">
+  Original Ref: {{ original_ref }} &nbsp;&bull;&nbsp; Follow-Up Ref: {{ follow_up_id }} &nbsp;&bull;&nbsp; This communication constitutes a formal legal request under applicable U.S. federal and state privacy laws.
+</div>
+
+</body>
+</html>

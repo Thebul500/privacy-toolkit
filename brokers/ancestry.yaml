@@ -1,6 +1,7 @@
 slug: ancestry
 name: Ancestry.com
 url: https://www.ancestry.com
+privacy_policy_url: https://www.ancestry.com/cs/legal/privacystatement
 category: genealogy
 priority: high
 data_types:

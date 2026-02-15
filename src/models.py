@@ -182,6 +182,7 @@ class Broker:
     methods: list[OptOutMethod] = field(default_factory=list)
     verification: Verification = field(default_factory=Verification)
     reappearance_days: int = 90
+    privacy_policy_url: str = ""
     notes: str = ""
 
     @classmethod
@@ -228,6 +229,7 @@ class Broker:
                 expected_days=ver.get("expected_days", 30),
             ),
             reappearance_days=opt_out.get("reappearance", {}).get("frequency_days", 90),
+            privacy_policy_url=data.get("privacy_policy_url", ""),
             notes=data.get("notes", ""),
         )
 
