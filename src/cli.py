@@ -13,7 +13,7 @@ from pathlib import Path
 import click
 from rich.console import Console
 from rich.panel import Panel
-from rich.progress import Progress, SpinnerColumn, TextColumn
+from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskProgressColumn
 from rich.table import Table
 from rich.text import Text
 
@@ -92,22 +92,28 @@ def scan_username(ctx, usernames):
             click.echo("Warning: Skipping empty username.", err=True)
             continue
         console.print(f"\n[bold]Scanning username: {username}[/bold]")
-        for scanner in scanners:
-            scan_id = db.create_scan(profile_name, scanner.name, "username", username)
-            console.print(f"  Running {scanner.name}...", end=" ")
-            try:
-                results = scanner.scan(username)
-                for r in results:
-                    db.add_finding(
-                        scan_id, profile_name, r.scanner, r.site_name,
-                        r.site_url, r.data_type, r.details, r.confidence,
-                    )
-                db.complete_scan(scan_id, len(results))
-                console.print(f"[green]{len(results)} found[/green]")
-                total_results += len(results)
-            except Exception as e:
-                db.fail_scan(scan_id, str(e))
-                console.print(f"[red]failed: {e}[/red]")
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            console=console,
+        ) as progress:
+            task = progress.add_task(f"Running {scanners[0].name}...", total=None)
+            for scanner in scanners:
+                progress.update(task, description=f"Running {scanner.name}...")
+                scan_id = db.create_scan(profile_name, scanner.name, "username", username)
+                try:
+                    results = scanner.scan(username)
+                    for r in results:
+                        db.add_finding(
+                            scan_id, profile_name, r.scanner, r.site_name,
+                            r.site_url, r.data_type, r.details, r.confidence,
+                        )
+                    db.complete_scan(scan_id, len(results))
+                    total_results += len(results)
+                except Exception as e:
+                    db.fail_scan(scan_id, str(e))
+                    click.echo(f"  {scanner.name} failed: {e}", err=True)
+            progress.update(task, description=f"Complete: {total_results} accounts found")
 
     console.print(f"\n[bold]Total: {total_results} exposures found.[/bold]")
     console.print("Run [bold]privacy-toolkit report[/bold] to view details.")
@@ -146,35 +152,28 @@ def scan_email(ctx, emails):
             click.echo(f"Warning: Skipping invalid email (missing @): {email}", err=True)
             continue
         console.print(f"\n[bold]Scanning email: {email}[/bold]")
-        for scanner in scanners:
-            scan_id = db.create_scan(profile_name, scanner.name, "email", email)
-            console.print(f"  Running {scanner.name}...", end=" ")
-            try:
-                results = scanner.scan(email)
-                for r in results:
-                    db.add_finding(
-                        scan_id, profile_name, r.scanner, r.site_name,
-                        r.site_url, r.data_type, r.details, r.confidence,
-                    )
-                db.complete_scan(scan_id, len(results))
-                if scanner.name == "hibp":
-                    breaches = [r for r in results if r.data_type == "breach"]
-                    pastes = [r for r in results if r.data_type == "paste"]
-                    parts = []
-                    if breaches:
-                        parts.append(f"{len(breaches)} breaches")
-                    if pastes:
-                        parts.append(f"{len(pastes)} pastes")
-                    if parts:
-                        console.print(f"[red]{', '.join(parts)} found[/red]")
-                    else:
-                        console.print("[green]no breaches found[/green]")
-                else:
-                    console.print(f"[green]{len(results)} services found[/green]")
-                total_results += len(results)
-            except Exception as e:
-                db.fail_scan(scan_id, str(e))
-                console.print(f"[red]failed: {e}[/red]")
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            console=console,
+        ) as progress:
+            task = progress.add_task(f"Running {scanners[0].name}...", total=None)
+            for scanner in scanners:
+                progress.update(task, description=f"Running {scanner.name}...")
+                scan_id = db.create_scan(profile_name, scanner.name, "email", email)
+                try:
+                    results = scanner.scan(email)
+                    for r in results:
+                        db.add_finding(
+                            scan_id, profile_name, r.scanner, r.site_name,
+                            r.site_url, r.data_type, r.details, r.confidence,
+                        )
+                    db.complete_scan(scan_id, len(results))
+                    total_results += len(results)
+                except Exception as e:
+                    db.fail_scan(scan_id, str(e))
+                    click.echo(f"  {scanner.name} failed: {e}", err=True)
+            progress.update(task, description=f"Complete: {total_results} exposures found")
 
     console.print(f"\n[bold]Total: {total_results} exposures found.[/bold]")
 
@@ -255,7 +254,14 @@ def scan_people(ctx, query, query_type):
     scan_id = db.create_scan(profile_name, "people_search", query_type, query)
 
     try:
-        results = scanner.scan(query, query_type)
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            console=console,
+        ) as progress:
+            task = progress.add_task("Checking data broker sites...", total=None)
+            results = scanner.scan(query, query_type)
+            progress.update(task, description=f"Found {len(results)} results")
         for r in results:
             db.add_finding(
                 scan_id, profile_name, r.scanner, r.site_name,
@@ -290,50 +296,78 @@ def scan_full(ctx):
 
     console.print(f"\n[bold]Full Scan for profile: {profile_name}[/bold]\n")
 
-    # Username scans
-    if profile.usernames:
-        console.print("[bold cyan]--- Username Scans ---[/bold cyan]")
-        ctx.invoke(scan_username, usernames=tuple(profile.usernames))
-
-    # Email scans
-    if profile.email_addresses:
-        console.print("\n[bold cyan]--- Email Scans ---[/bold cyan]")
-        ctx.invoke(scan_email, emails=tuple(profile.email_addresses))
-
-    # Phone scans
-    if profile.phone_numbers:
-        console.print("\n[bold cyan]--- Phone Scans ---[/bold cyan]")
-        ctx.invoke(scan_phone, phones=tuple(profile.phone_numbers))
-
-    # People-search scans (name + phone + email across data broker sites)
-    console.print("\n[bold cyan]--- People Search Scans ---[/bold cyan]")
+    # Determine which scanners will actually run
     from src.scanners.people_search_scanner import PeopleSearchScanner
     config = ctx.obj["config"]
     ps = PeopleSearchScanner(rate_limit_delay=config.browser.rate_limit_delay)
-    if ps.is_available():
-        if profile.first_name and profile.last_name:
-            if profile.addresses:
-                state = profile.addresses[0].state_abbr or profile.addresses[0].state
-            else:
-                state = None
-            name_query = f"{profile.first_name} {profile.last_name}"
-            if state:
-                name_query += f" {state}"
-            ctx.invoke(scan_people, query=name_query, query_type="name")
-        if profile.phone_numbers:
-            for phone in profile.phone_numbers:
-                ctx.invoke(scan_people, query=phone, query_type="phone")
+    ps_available = ps.is_available()
+
+    scanner_count = 0
+    if profile.usernames:
+        scanner_count += 1
+    if profile.email_addresses:
+        scanner_count += 1
+    if profile.phone_numbers:
+        scanner_count += 1
+    if ps_available:
+        scanner_count += 1
+
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        BarColumn(),
+        TaskProgressColumn(),
+        console=console,
+    ) as progress:
+        overall = progress.add_task("Full scan", total=scanner_count)
+
+        # Username scans
+        if profile.usernames:
+            progress.update(overall, description="Scanning usernames (Sherlock + Maigret)...")
+            ctx.invoke(scan_username, usernames=tuple(profile.usernames))
+            progress.advance(overall)
+
+        # Email scans
         if profile.email_addresses:
-            for email in profile.email_addresses:
-                ctx.invoke(scan_people, query=email, query_type="email")
-        if profile.addresses:
-            for addr in profile.addresses:
-                if addr.street and addr.city and (addr.state_abbr or addr.state):
-                    state = addr.state_abbr or addr.state
-                    addr_query = f"{addr.street}|{addr.city}|{state}|{addr.zip_code}"
-                    ctx.invoke(scan_people, query=addr_query, query_type="address")
-    else:
-        console.print("[yellow]People-search scanner not available. Skipping.[/yellow]")
+            progress.update(overall, description="Scanning emails (Holehe + HIBP)...")
+            ctx.invoke(scan_email, emails=tuple(profile.email_addresses))
+            progress.advance(overall)
+
+        # Phone scans
+        if profile.phone_numbers:
+            progress.update(overall, description="Scanning phone numbers (PhoneInfoga)...")
+            ctx.invoke(scan_phone, phones=tuple(profile.phone_numbers))
+            progress.advance(overall)
+
+        # People-search scans (name + phone + email across data broker sites)
+        if ps_available:
+            progress.update(overall, description="Scanning people-search sites...")
+            if profile.first_name and profile.last_name:
+                if profile.addresses:
+                    state = profile.addresses[0].state_abbr or profile.addresses[0].state
+                else:
+                    state = None
+                name_query = f"{profile.first_name} {profile.last_name}"
+                if state:
+                    name_query += f" {state}"
+                ctx.invoke(scan_people, query=name_query, query_type="name")
+            if profile.phone_numbers:
+                for phone in profile.phone_numbers:
+                    ctx.invoke(scan_people, query=phone, query_type="phone")
+            if profile.email_addresses:
+                for email in profile.email_addresses:
+                    ctx.invoke(scan_people, query=email, query_type="email")
+            if profile.addresses:
+                for addr in profile.addresses:
+                    if addr.street and addr.city and (addr.state_abbr or addr.state):
+                        state = addr.state_abbr or addr.state
+                        addr_query = f"{addr.street}|{addr.city}|{state}|{addr.zip_code}"
+                        ctx.invoke(scan_people, query=addr_query, query_type="address")
+            progress.advance(overall)
+        else:
+            console.print("[yellow]People-search scanner not available. Skipping.[/yellow]")
+
+        progress.update(overall, description="Full scan complete")
 
     console.print("\n[bold green]Full scan complete.[/bold green]")
     console.print(f"Run [bold]privacy-toolkit report -p {profile_name}[/bold] to view all results.")
@@ -396,18 +430,49 @@ def accounts_find_by_email(ctx, email, config_path):
     db = ctx.obj["db"]
     profile_name = ctx.obj["profile_name"] or "cli"
 
+    all_results = []
+
     from src.scanners.holehe_scanner import HoleheScanner
     from src.scanners.hibp_scanner import HIBPScanner
 
-    all_results = []
-
-    # --- Holehe: find registered accounts ---
     holehe = HoleheScanner()
-    if holehe.is_available():
-        click.echo("Checking registered accounts...")
-        scan_id = db.create_scan(profile_name, holehe.name, "email", email)
+    holehe_available = holehe.is_available()
+    if not holehe_available:
+        console.print("[yellow]Holehe not available. Skipping account discovery.[/yellow]")
+
+    hibp_key = getattr(config, "hibp_api_key", "")
+    hibp = HIBPScanner(api_key=hibp_key)
+
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        console=console,
+    ) as progress:
+        task = progress.add_task("Checking registered accounts...", total=None)
+
+        # --- Holehe: find registered accounts ---
+        if holehe_available:
+            progress.update(task, description="Checking registered accounts (Holehe)...")
+            scan_id = db.create_scan(profile_name, holehe.name, "email", email)
+            try:
+                results = holehe.scan(email)
+                for r in results:
+                    db.add_finding(
+                        scan_id, profile_name, r.scanner, r.site_name,
+                        r.site_url, r.data_type, r.details, r.confidence,
+                    )
+                db.complete_scan(scan_id, len(results))
+                all_results.extend(results)
+            except Exception as e:
+                db.fail_scan(scan_id, str(e))
+                click.echo(f"  Holehe failed: {e}", err=True)
+                logger.error("Holehe scan failed for %s: %s", email, e)
+
+        # --- HIBP: find breaches and pastes ---
+        progress.update(task, description="Scanning breaches and paste dumps (HIBP)...")
+        scan_id = db.create_scan(profile_name, hibp.name, "email", email)
         try:
-            results = holehe.scan(email)
+            results = hibp.scan(email)
             for r in results:
                 db.add_finding(
                     scan_id, profile_name, r.scanner, r.site_name,
@@ -415,43 +480,12 @@ def accounts_find_by_email(ctx, email, config_path):
                 )
             db.complete_scan(scan_id, len(results))
             all_results.extend(results)
-            console.print(f"  [green]Holehe: {len(results)} registered accounts found[/green]")
         except Exception as e:
             db.fail_scan(scan_id, str(e))
-            console.print(f"  [red]Holehe failed: {e}[/red]")
-            logger.error("Holehe scan failed for %s: %s", email, e)
-    else:
-        console.print("[yellow]Holehe not available. Skipping account discovery.[/yellow]")
+            click.echo(f"  HIBP failed: {e}", err=True)
+            logger.error("HIBP scan failed for %s: %s", email, e)
 
-    # --- HIBP: find breaches and pastes ---
-    hibp_key = getattr(config, "hibp_api_key", "")
-    hibp = HIBPScanner(api_key=hibp_key)
-    click.echo("Scanning breaches and paste dumps...")
-    scan_id = db.create_scan(profile_name, hibp.name, "email", email)
-    try:
-        results = hibp.scan(email)
-        for r in results:
-            db.add_finding(
-                scan_id, profile_name, r.scanner, r.site_name,
-                r.site_url, r.data_type, r.details, r.confidence,
-            )
-        db.complete_scan(scan_id, len(results))
-        all_results.extend(results)
-        breaches = [r for r in results if r.data_type == "breach"]
-        pastes = [r for r in results if r.data_type == "paste"]
-        parts = []
-        if breaches:
-            parts.append(f"{len(breaches)} breaches")
-        if pastes:
-            parts.append(f"{len(pastes)} pastes")
-        if parts:
-            console.print(f"  [red]HIBP: {', '.join(parts)} found[/red]")
-        else:
-            console.print("  [green]HIBP: no breaches found[/green]")
-    except Exception as e:
-        db.fail_scan(scan_id, str(e))
-        console.print(f"  [red]HIBP failed: {e}[/red]")
-        logger.error("HIBP scan failed for %s: %s", email, e)
+        progress.update(task, description=f"Complete: {len(all_results)} results found")
 
     if not all_results:
         console.print(f"\n[green]No accounts or breaches found for {email}.[/green]")
@@ -569,27 +603,29 @@ def accounts_find_by_phone(ctx, phone, config_path):
         console.print("[red]PhoneInfoga not available. Run install.sh first.[/red]")
         return
 
-    click.echo(f"Scanning phone number: {phone}...")
     scan_id = db.create_scan(profile_name, "phoneinfoga", "phone", phone)
 
     all_results = []
-    try:
-        results = scanner.scan(phone)
-        for r in results:
-            db.add_finding(
-                scan_id, profile_name, r.scanner, r.site_name,
-                r.site_url, r.data_type, r.details, r.confidence,
-            )
-        db.complete_scan(scan_id, len(results))
-        all_results.extend(results)
-        if results:
-            console.print(f"  [green]PhoneInfoga: information gathered[/green]")
-        else:
-            console.print("  [yellow]PhoneInfoga: no information found[/yellow]")
-    except Exception as e:
-        db.fail_scan(scan_id, str(e))
-        console.print(f"  [red]PhoneInfoga failed: {e}[/red]")
-        logger.error("PhoneInfoga scan failed for %s: %s", phone, e)
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        console=console,
+    ) as progress:
+        task = progress.add_task(f"Scanning phone number: {phone}...", total=None)
+        try:
+            results = scanner.scan(phone)
+            for r in results:
+                db.add_finding(
+                    scan_id, profile_name, r.scanner, r.site_name,
+                    r.site_url, r.data_type, r.details, r.confidence,
+                )
+            db.complete_scan(scan_id, len(results))
+            all_results.extend(results)
+        except Exception as e:
+            db.fail_scan(scan_id, str(e))
+            click.echo(f"  PhoneInfoga failed: {e}", err=True)
+            logger.error("PhoneInfoga scan failed for %s: %s", phone, e)
+        progress.update(task, description=f"Complete: {len(all_results)} results found")
 
     if not all_results:
         console.print(f"\n[green]No information found for {phone}.[/green]")
@@ -677,26 +713,33 @@ def accounts_find_by_username(ctx, username, config_path):
     sherlock_results = []
     maigret_results = []
 
-    for scanner in scanners_available:
-        click.echo(f"Running {scanner.name} for username: {username}...")
-        scan_id = db.create_scan(profile_name, scanner.name, "username", username)
-        try:
-            results = scanner.scan(username)
-            for r in results:
-                db.add_finding(
-                    scan_id, profile_name, r.scanner, r.site_name,
-                    r.site_url, r.data_type, r.details, r.confidence,
-                )
-            db.complete_scan(scan_id, len(results))
-            if scanner.name == "sherlock":
-                sherlock_results = results
-            elif scanner.name == "maigret":
-                maigret_results = results
-            console.print(f"  [green]{scanner.name}: {len(results)} accounts found[/green]")
-        except Exception as e:
-            db.fail_scan(scan_id, str(e))
-            console.print(f"  [red]{scanner.name} failed: {e}[/red]")
-            logger.error("%s scan failed for %s: %s", scanner.name, username, e)
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        console=console,
+    ) as progress:
+        task = progress.add_task(f"Running {scanners_available[0].name}...", total=None)
+        for scanner in scanners_available:
+            progress.update(task, description=f"Running {scanner.name}...")
+            scan_id = db.create_scan(profile_name, scanner.name, "username", username)
+            try:
+                results = scanner.scan(username)
+                for r in results:
+                    db.add_finding(
+                        scan_id, profile_name, r.scanner, r.site_name,
+                        r.site_url, r.data_type, r.details, r.confidence,
+                    )
+                db.complete_scan(scan_id, len(results))
+                if scanner.name == "sherlock":
+                    sherlock_results = results
+                elif scanner.name == "maigret":
+                    maigret_results = results
+            except Exception as e:
+                db.fail_scan(scan_id, str(e))
+                click.echo(f"  {scanner.name} failed: {e}", err=True)
+                logger.error("%s scan failed for %s: %s", scanner.name, username, e)
+        total_found = len(sherlock_results) + len(maigret_results)
+        progress.update(task, description=f"Complete: {total_found} accounts found")
 
     # --- Deduplicate: prefer Maigret results when both find the same site ---
     maigret_sites = {r.site_name.lower(): r for r in maigret_results}
@@ -787,34 +830,35 @@ def accounts_exposure_report(ctx, profile_name, config_path):
         border_style="blue",
     ))
 
-    for email in profile.email_addresses:
-        click.echo(f"Scanning breaches for {email}...")
-        scan_id = db.create_scan(profile_name, hibp.name, "email", email)
-        try:
-            results = hibp.scan(email)
-            for r in results:
-                db.add_finding(
-                    scan_id, profile_name, r.scanner, r.site_name,
-                    r.site_url, r.data_type, r.details, r.confidence,
-                )
-            db.complete_scan(scan_id, len(results))
-            breaches = [r for r in results if r.data_type == "breach"]
-            pastes = [r for r in results if r.data_type == "paste"]
-            for b in breaches:
-                all_breaches.append((email, b))
-            parts = []
-            if breaches:
-                parts.append(f"{len(breaches)} breaches")
-            if pastes:
-                parts.append(f"{len(pastes)} pastes")
-            if parts:
-                console.print(f"  [red]{email}: {', '.join(parts)}[/red]")
-            else:
-                console.print(f"  [green]{email}: clean[/green]")
-        except Exception as e:
-            db.fail_scan(scan_id, str(e))
-            console.print(f"  [red]{email}: scan failed - {e}[/red]")
-            logger.error("HIBP scan failed for %s: %s", email, e)
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        BarColumn(),
+        TaskProgressColumn(),
+        console=console,
+    ) as progress:
+        task = progress.add_task("Checking breaches", total=email_count)
+        for email in profile.email_addresses:
+            progress.update(task, description=f"Checking {email}...")
+            scan_id = db.create_scan(profile_name, hibp.name, "email", email)
+            try:
+                results = hibp.scan(email)
+                for r in results:
+                    db.add_finding(
+                        scan_id, profile_name, r.scanner, r.site_name,
+                        r.site_url, r.data_type, r.details, r.confidence,
+                    )
+                db.complete_scan(scan_id, len(results))
+                breaches = [r for r in results if r.data_type == "breach"]
+                pastes = [r for r in results if r.data_type == "paste"]
+                for b in breaches:
+                    all_breaches.append((email, b))
+            except Exception as e:
+                db.fail_scan(scan_id, str(e))
+                click.echo(f"  {email}: scan failed - {e}", err=True)
+                logger.error("HIBP scan failed for %s: %s", email, e)
+            progress.advance(task)
+        progress.update(task, description=f"Complete: {len(all_breaches)} breaches found")
 
     if not all_breaches:
         console.print()

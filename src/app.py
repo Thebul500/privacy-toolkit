@@ -16,6 +16,7 @@ from fastapi.templating import Jinja2Templates
 from src.config import (
     Config,
     PROFILES_DIR,
+    TOOLKIT_DIR,
     load_all_brokers,
     load_profile,
     list_profiles,
@@ -23,6 +24,8 @@ from src.config import (
 from src.db import Database
 from src.models import Profile
 from src.tasks import TaskManager, TaskStatus, run_email_removals, run_full_scan
+
+GUIDES_DIR = TOOLKIT_DIR / "guides"
 
 logger = logging.getLogger(__name__)
 
@@ -301,6 +304,178 @@ async def scans_active(request: Request):
         </div>
     </div>
     """)
+
+
+@app.get("/accounts", response_class=HTMLResponse)
+async def accounts_page(request: Request):
+    """Accounts discovery page."""
+    return templates.TemplateResponse("accounts.html", {
+        "request": request,
+        "active": "accounts",
+    })
+
+
+@app.post("/accounts/search", response_class=HTMLResponse)
+async def accounts_search(request: Request, query: str = Form(...), search_type: str = Form(...)):
+    """Run account discovery scan and return results as HTML fragment."""
+    results = []
+    error = None
+
+    if search_type == "email":
+        if "@" not in query:
+            return templates.TemplateResponse("accounts_results.html", {
+                "request": request,
+                "results": [],
+                "search_type": search_type,
+                "query": query,
+                "error": f"Invalid email address: {query}",
+                "breach_count": 0,
+                "paste_count": 0,
+                "account_count": 0,
+                "risk_level": "LOW",
+                "risk_detail": "",
+            })
+
+        # Run Holehe
+        try:
+            from src.scanners.holehe_scanner import HoleheScanner
+            holehe = HoleheScanner()
+            if holehe.is_available():
+                holehe_results = holehe.scan(query)
+                results.extend(holehe_results)
+        except Exception as e:
+            logger.error("Holehe scan failed for %s: %s", query, e)
+            error = f"Holehe scan failed: {e}"
+
+        # Run HIBP
+        try:
+            from src.scanners.hibp_scanner import HIBPScanner
+            hibp_key = getattr(config, "hibp_api_key", "")
+            hibp = HIBPScanner(api_key=hibp_key)
+            hibp_results = hibp.scan(query)
+            results.extend(hibp_results)
+        except Exception as e:
+            logger.error("HIBP scan failed for %s: %s", query, e)
+            if error:
+                error += f"; HIBP scan failed: {e}"
+            else:
+                error = f"HIBP scan failed: {e}"
+
+    elif search_type == "phone":
+        try:
+            from src.scanners.phoneinfoga_scanner import PhoneInfogaScanner
+            scanner = PhoneInfogaScanner()
+            if scanner.is_available():
+                results = scanner.scan(query)
+            else:
+                error = "PhoneInfoga scanner is not available. Run install.sh first."
+        except Exception as e:
+            logger.error("PhoneInfoga scan failed for %s: %s", query, e)
+            error = f"Phone scan failed: {e}"
+
+    elif search_type == "username":
+        try:
+            from src.scanners.sherlock_scanner import SherlockScanner
+            sherlock = SherlockScanner()
+            if sherlock.is_available():
+                sherlock_results = sherlock.scan(query)
+            else:
+                sherlock_results = []
+        except Exception as e:
+            logger.error("Sherlock scan failed for %s: %s", query, e)
+            sherlock_results = []
+
+        try:
+            from src.scanners.maigret_scanner import MaigretScanner
+            maigret = MaigretScanner()
+            if maigret.is_available():
+                maigret_results = maigret.scan(query)
+            else:
+                maigret_results = []
+        except Exception as e:
+            logger.error("Maigret scan failed for %s: %s", query, e)
+            maigret_results = []
+
+        if not sherlock_results and not maigret_results:
+            if not error:
+                # Check if either scanner was available at all
+                try:
+                    from src.scanners.sherlock_scanner import SherlockScanner
+                    from src.scanners.maigret_scanner import MaigretScanner
+                    s_avail = SherlockScanner().is_available()
+                    m_avail = MaigretScanner().is_available()
+                    if not s_avail and not m_avail:
+                        error = "No username scanners available. Run install.sh first."
+                except Exception:
+                    pass
+
+        # Deduplicate: prefer Maigret results when both find the same site
+        maigret_sites = {r.site_name.lower(): r for r in maigret_results}
+        results = list(maigret_results)
+        for r in sherlock_results:
+            if r.site_name.lower() not in maigret_sites:
+                results.append(r)
+    else:
+        error = f"Unknown search type: {search_type}"
+
+    # Compute breach stats for email results
+    breach_count = sum(1 for r in results if r.data_type == "breach")
+    paste_count = sum(1 for r in results if r.data_type == "paste")
+    account_count = sum(1 for r in results if r.data_type == "email_registered")
+
+    # Risk assessment for email breaches
+    risk_level = "LOW"
+    risk_detail = ""
+    if search_type == "email" and breach_count > 0:
+        all_data_classes = set()
+        for r in results:
+            if r.data_type == "breach":
+                all_data_classes.update(r.details.get("data_classes", []))
+
+        high_risk_types = {"Passwords", "Password hints", "Social security numbers",
+                           "Credit cards", "Bank account numbers", "Financial data",
+                           "Credit card CVV", "Partial credit card data", "PINs"}
+        medium_risk_types = {"Email addresses", "Phone numbers", "Physical addresses",
+                             "Dates of birth", "IP addresses", "Genders"}
+
+        exposed_high = all_data_classes & high_risk_types
+        exposed_medium = all_data_classes & medium_risk_types
+
+        if exposed_high:
+            risk_level = "HIGH"
+            risk_detail = f"Sensitive data exposed: {', '.join(sorted(exposed_high))}"
+        elif exposed_medium:
+            risk_level = "MEDIUM"
+            risk_detail = f"Personal data exposed: {', '.join(sorted(exposed_medium))}"
+        else:
+            risk_level = "LOW"
+            risk_detail = "Only non-sensitive data types exposed"
+
+    # Attach guide URLs to results where guides exist
+    for r in results:
+        guide_name = r.site_name.lower().replace(" ", "-")
+        guide_path = GUIDES_DIR / f"{guide_name}.yaml"
+        if guide_path.exists():
+            r.guide_url = f"/static/guides/{guide_name}"
+        else:
+            r.guide_url = ""
+
+    # If we had partial errors but still got results, clear the error
+    if results and error:
+        error = None
+
+    return templates.TemplateResponse("accounts_results.html", {
+        "request": request,
+        "results": results,
+        "search_type": search_type,
+        "query": query,
+        "error": error,
+        "breach_count": breach_count,
+        "paste_count": paste_count,
+        "account_count": account_count,
+        "risk_level": risk_level,
+        "risk_detail": risk_detail,
+    })
 
 
 @app.get("/removals", response_class=HTMLResponse)
