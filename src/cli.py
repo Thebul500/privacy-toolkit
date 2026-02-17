@@ -3,6 +3,8 @@
 from __future__ import annotations
 import asyncio
 import json
+import os
+import subprocess
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -14,8 +16,9 @@ from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.table import Table
 
 from src.config import (
-    Config, PROFILES_DIR, TOOLKIT_DIR,
+    BROKERS_DIR, Config, PROFILES_DIR, TOOLKIT_DIR,
     load_all_brokers, load_broker, load_profile, list_profiles,
+    validate_broker,
 )
 from src.db import Database
 from src.models import Profile
@@ -725,19 +728,31 @@ def schedule_status():
 # BROKERS COMMAND
 # ============================================================================
 
-@cli.command("brokers")
+@cli.group(invoke_without_command=True)
 @click.option("--priority", "-P", type=click.Choice(["critical", "high", "medium", "low"]), default=None)
-def brokers_list(priority):
-    """List all configured data brokers."""
-    brokers = load_all_brokers()
-    if priority:
-        brokers = [b for b in brokers if b.priority.value == priority]
+@click.pass_context
+def brokers(ctx, priority):
+    """Manage and inspect data broker definitions."""
+    ctx.ensure_object(dict)
+    ctx.obj["broker_priority"] = priority
+    if ctx.invoked_subcommand is None:
+        ctx.invoke(brokers_list)
 
-    if not brokers:
+
+@brokers.command("list")
+@click.pass_context
+def brokers_list(ctx):
+    """List all configured data brokers."""
+    priority = ctx.obj.get("broker_priority")
+    all_brokers = load_all_brokers()
+    if priority:
+        all_brokers = [b for b in all_brokers if b.priority.value == priority]
+
+    if not all_brokers:
         console.print("[yellow]No brokers found.[/yellow]")
         return
 
-    table = Table(title=f"Data Brokers ({len(brokers)})")
+    table = Table(title=f"Data Brokers ({len(all_brokers)})")
     table.add_column("Slug", style="bold", width=25)
     table.add_column("Name", width=25)
     table.add_column("Priority", width=10)
@@ -751,7 +766,7 @@ def brokers_list(priority):
         "low": "dim",
     }
 
-    for b in sorted(brokers, key=lambda x: ["critical", "high", "medium", "low"].index(x.priority.value)):
+    for b in sorted(all_brokers, key=lambda x: ["critical", "high", "medium", "low"].index(x.priority.value)):
         methods = ", ".join(m.type.value for m in b.methods)
         color = priority_colors.get(b.priority.value, "")
         table.add_row(
@@ -763,6 +778,311 @@ def brokers_list(priority):
         )
 
     console.print(table)
+
+
+@brokers.command("validate")
+def brokers_validate():
+    """Validate all broker YAML files against the expected schema."""
+    import yaml as _yaml
+
+    table = Table(title="Broker Validation Results")
+    table.add_column("Slug", style="bold", width=25)
+    table.add_column("Status", width=8)
+    table.add_column("Errors", width=60)
+
+    ok_count = 0
+    warn_count = 0
+    fail_count = 0
+
+    for path in sorted(BROKERS_DIR.glob("*.yaml")):
+        if path.stem.startswith("_"):
+            continue
+        try:
+            with open(path) as f:
+                data = _yaml.safe_load(f) or {}
+        except Exception as e:
+            fail_count += 1
+            table.add_row(path.stem, "[red]FAIL[/red]", f"YAML parse error: {e}")
+            continue
+
+        errors = validate_broker(data, path.name)
+        slug = data.get("slug", path.stem)
+
+        if errors:
+            warn_count += 1
+            table.add_row(
+                slug,
+                "[yellow]WARN[/yellow]",
+                "; ".join(errors),
+            )
+        else:
+            ok_count += 1
+            table.add_row(slug, "[green]OK[/green]", "")
+
+    console.print(table)
+    console.print(
+        f"\n[bold]Summary:[/bold] {ok_count} OK, {warn_count} warnings, "
+        f"{fail_count} failures out of {ok_count + warn_count + fail_count} brokers"
+    )
+
+
+# ============================================================================
+# DOCTOR COMMAND
+# ============================================================================
+
+@cli.command("doctor")
+@click.pass_context
+def doctor(ctx):
+    """Check all dependencies and report their status."""
+    from src.config import BIN_DIR
+
+    config = ctx.obj["config"]
+
+    table = Table(title="Privacy Toolkit - Dependency Check")
+    table.add_column("Component", style="bold", width=16)
+    table.add_column("Status", width=10)
+    table.add_column("Details")
+
+    def _ok(details: str):
+        return "[green]OK[/green]", details
+
+    def _warn(details: str):
+        return "[yellow]WARN[/yellow]", details
+
+    def _missing(details: str):
+        return "[red]MISSING[/red]", details
+
+    # 1. Python version
+    try:
+        ver = sys.version_info
+        ver_str = f"{ver.major}.{ver.minor}.{ver.micro}"
+        if ver >= (3, 12):
+            status, detail = _ok(ver_str)
+        else:
+            status, detail = _warn(f"{ver_str} (3.12+ recommended)")
+    except Exception:
+        status, detail = _missing("Could not determine Python version")
+    table.add_row("Python", status, detail)
+
+    # 2. Playwright + Chromium
+    try:
+        from playwright.sync_api import sync_playwright  # noqa: F401
+        import playwright as _pw
+        pw_version = getattr(_pw, "__version__", "unknown")
+        browsers_path = Path.home() / ".cache" / "ms-playwright"
+        chromium_dirs = list(browsers_path.glob("chromium-*")) if browsers_path.exists() else []
+        if chromium_dirs:
+            status, detail = _ok(f"Chromium installed (playwright {pw_version})")
+        else:
+            status, detail = _warn(
+                f"playwright {pw_version}, but Chromium not found. "
+                "Run: playwright install chromium"
+            )
+    except ImportError:
+        status, detail = _missing(
+            "Not installed. Run: pip install playwright && playwright install chromium"
+        )
+    except Exception as e:
+        status, detail = _missing(f"Error: {e}")
+    table.add_row("Playwright", status, detail)
+
+    # 3. Holehe
+    try:
+        import holehe as _holehe
+        holehe_version = getattr(_holehe, "__version__", "unknown")
+        status, detail = _ok(holehe_version)
+    except ImportError:
+        status, detail = _missing("Not installed. Run: pip install holehe")
+    except Exception as e:
+        status, detail = _missing(f"Error: {e}")
+    table.add_row("Holehe", status, detail)
+
+    # 4. Sherlock
+    try:
+        result = subprocess.run(
+            [sys.executable, "-m", "sherlock_project", "--version"],
+            capture_output=True, text=True, timeout=5,
+        )
+        if result.returncode == 0:
+            version_out = (result.stdout.strip() or result.stderr.strip())
+            status, detail = _ok(version_out if version_out else "installed")
+        else:
+            status, detail = _missing("Not installed. Run: pip install sherlock-project")
+    except subprocess.TimeoutExpired:
+        status, detail = _warn("Installed but timed out checking version")
+    except FileNotFoundError:
+        status, detail = _missing("Not installed. Run: pip install sherlock-project")
+    except Exception as e:
+        status, detail = _missing(f"Error: {e}")
+    table.add_row("Sherlock", status, detail)
+
+    # 5. Maigret
+    try:
+        result = subprocess.run(
+            [sys.executable, "-m", "maigret", "--version"],
+            capture_output=True, text=True, timeout=5,
+        )
+        if result.returncode == 0:
+            version_out = (result.stdout.strip() or result.stderr.strip())
+            status, detail = _ok(version_out if version_out else "installed")
+        else:
+            status, detail = _missing("Not installed. Run: pip install maigret")
+    except subprocess.TimeoutExpired:
+        status, detail = _warn("Installed but timed out checking version")
+    except FileNotFoundError:
+        status, detail = _missing("Not installed. Run: pip install maigret")
+    except Exception as e:
+        status, detail = _missing(f"Error: {e}")
+    table.add_row("Maigret", status, detail)
+
+    # 6. PhoneInfoga
+    try:
+        phoneinfoga_bin = BIN_DIR / "phoneinfoga"
+        if phoneinfoga_bin.exists() and os.access(phoneinfoga_bin, os.X_OK):
+            try:
+                result = subprocess.run(
+                    [str(phoneinfoga_bin), "version"],
+                    capture_output=True, text=True, timeout=5,
+                )
+                version_out = (result.stdout.strip() or result.stderr.strip())
+                if version_out:
+                    status, detail = _ok(f"{phoneinfoga_bin} ({version_out})")
+                else:
+                    status, detail = _ok(str(phoneinfoga_bin))
+            except Exception:
+                status, detail = _ok(str(phoneinfoga_bin))
+        elif phoneinfoga_bin.exists():
+            status, detail = _warn(f"{phoneinfoga_bin} (not executable)")
+        else:
+            status, detail = _missing(f"Binary not found at {phoneinfoga_bin}")
+    except Exception as e:
+        status, detail = _missing(f"Error: {e}")
+    table.add_row("PhoneInfoga", status, detail)
+
+    # 7. SpiderFoot Docker image
+    try:
+        result = subprocess.run(
+            ["docker", "image", "inspect", "ghcr.io/smicallef/spiderfoot:latest"],
+            capture_output=True, text=True, timeout=5,
+        )
+        if result.returncode == 0:
+            status, detail = _ok("Docker image available")
+        else:
+            status, detail = _missing(
+                "Docker image not found. Run: docker pull ghcr.io/smicallef/spiderfoot:latest"
+            )
+    except FileNotFoundError:
+        status, detail = _missing("Docker not installed")
+    except subprocess.TimeoutExpired:
+        status, detail = _warn("Docker timed out checking image")
+    except Exception as e:
+        status, detail = _missing(f"Error: {e}")
+    table.add_row("SpiderFoot", status, detail)
+
+    # 8. SMTP configuration
+    try:
+        smtp = config.smtp
+        if smtp.username and smtp.password and smtp.host:
+            status, detail = _ok(f"{smtp.host}:{smtp.port}")
+        elif smtp.host:
+            missing_parts = []
+            if not smtp.username:
+                missing_parts.append("username")
+            if not smtp.password:
+                missing_parts.append("password")
+            status, detail = _warn(
+                f"{smtp.host}:{smtp.port} (missing {', '.join(missing_parts)})"
+            )
+        else:
+            status, detail = _warn("No SMTP host configured")
+    except Exception as e:
+        status, detail = _missing(f"Error: {e}")
+    table.add_row("SMTP", status, detail)
+
+    # 9. HIBP API key
+    try:
+        hibp_key = config.hibp_api_key
+        if hibp_key:
+            masked = hibp_key[:4] + "..." + hibp_key[-4:] if len(hibp_key) > 8 else "***"
+            status, detail = _ok(f"Key configured ({masked})")
+        else:
+            status, detail = _warn("No API key configured (free tier only, limited)")
+    except Exception as e:
+        status, detail = _missing(f"Error: {e}")
+    table.add_row("HIBP API", status, detail)
+
+    # 10. Signal API
+    try:
+        sig = config.signal
+        if sig.enabled and sig.api_url:
+            try:
+                import requests as _requests
+                resp = _requests.get(f"{sig.api_url}/v1/about", timeout=5)
+                if resp.status_code == 200:
+                    status, detail = _ok(f"{sig.api_url} (reachable)")
+                else:
+                    status, detail = _warn(f"{sig.api_url} (HTTP {resp.status_code})")
+            except Exception:
+                status, detail = _warn(f"{sig.api_url} (configured but not reachable)")
+        elif sig.enabled:
+            status, detail = _warn("Enabled but no API URL configured")
+        else:
+            status, detail = _warn("Notifications disabled")
+    except Exception as e:
+        status, detail = _missing(f"Error: {e}")
+    table.add_row("Signal", status, detail)
+
+    # 11. Database
+    try:
+        db_path = Path(config.db_path)
+        if not db_path.is_absolute():
+            db_path = TOOLKIT_DIR / db_path
+        if db_path.exists():
+            size_bytes = db_path.stat().st_size
+            if size_bytes < 1024:
+                size_str = f"{size_bytes} B"
+            elif size_bytes < 1024 * 1024:
+                size_str = f"{size_bytes / 1024:.0f} KB"
+            else:
+                size_str = f"{size_bytes / (1024 * 1024):.1f} MB"
+            try:
+                import sqlite3
+                conn = sqlite3.connect(str(db_path))
+                conn.execute("SELECT 1")
+                conn.close()
+                status, detail = _ok(f"{config.db_path} ({size_str})")
+            except Exception:
+                status, detail = _warn(
+                    f"{config.db_path} ({size_str}, not readable as SQLite)"
+                )
+        else:
+            status, detail = _warn(
+                f"Not found at {config.db_path} (will be created on first scan)"
+            )
+    except Exception as e:
+        status, detail = _missing(f"Error: {e}")
+    table.add_row("Database", status, detail)
+
+    # 12. Broker YAML files
+    try:
+        if BROKERS_DIR.exists():
+            broker_files = [
+                f for f in BROKERS_DIR.glob("*.yaml") if not f.stem.startswith("_")
+            ]
+            count = len(broker_files)
+            if count > 0:
+                status, detail = _ok(f"{count} loaded")
+            else:
+                status, detail = _warn("No broker YAML files found")
+        else:
+            status, detail = _missing(f"Brokers directory not found: {BROKERS_DIR}")
+    except Exception as e:
+        status, detail = _missing(f"Error: {e}")
+    table.add_row("Brokers", status, detail)
+
+    console.print()
+    console.print(table)
+    console.print()
 
 
 def main():

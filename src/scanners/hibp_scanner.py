@@ -44,7 +44,7 @@ class HIBPScanner(BaseScanner):
         params = {"truncateResponse": "false"}
 
         try:
-            resp = self.session.get(url, params=params, timeout=15)
+            resp = self.session.get(url, params=params, timeout=30)
         except requests.RequestException as e:
             raise RuntimeError(f"HIBP API request failed: {e}")
 
@@ -54,7 +54,7 @@ class HIBPScanner(BaseScanner):
             retry_after = int(resp.headers.get("Retry-After", 2))
             time.sleep(retry_after)
             try:
-                resp = self.session.get(url, params=params, timeout=15)
+                resp = self.session.get(url, params=params, timeout=30)
             except requests.RequestException:
                 return []
             if resp.status_code != 200:
@@ -91,7 +91,7 @@ class HIBPScanner(BaseScanner):
         """Fallback: check all known breaches (no API key needed)."""
         url = f"{HIBP_API}/breaches"
         try:
-            resp = self.session.get(url, timeout=15)
+            resp = self.session.get(url, timeout=30)
         except requests.RequestException:
             return []
 
@@ -107,7 +107,7 @@ class HIBPScanner(BaseScanner):
         url = f"{HIBP_API}/pasteaccount/{requests.utils.quote(email)}"
 
         try:
-            resp = self.session.get(url, timeout=15)
+            resp = self.session.get(url, timeout=30)
         except requests.RequestException:
             return []
 
@@ -120,7 +120,7 @@ class HIBPScanner(BaseScanner):
             retry_after = int(resp.headers.get("Retry-After", 2))
             time.sleep(retry_after)
             try:
-                resp = self.session.get(url, timeout=15)
+                resp = self.session.get(url, timeout=30)
             except requests.RequestException:
                 return []
             if resp.status_code != 200:

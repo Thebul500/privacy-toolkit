@@ -356,6 +356,7 @@ class PeopleSearchScanner(BaseScanner):
                 ),
                 viewport={"width": 1920, "height": 1080},
             )
+            context.set_default_timeout(30000)
 
             for site in PEOPLE_SEARCH_SITES:
                 try:

@@ -139,7 +139,7 @@ class EmailRemover:
             return {"success": False, "error": "SMTP not configured. Edit config/config.yaml"}
 
         try:
-            with smtplib.SMTP(self.smtp.host, self.smtp.port) as server:
+            with smtplib.SMTP(self.smtp.host, self.smtp.port, timeout=30) as server:
                 if self.smtp.use_tls:
                     server.starttls()
                 server.login(self.smtp.username, self.smtp.password)
@@ -244,7 +244,7 @@ class EmailRemover:
             return {"success": False, "error": "SMTP not configured"}
 
         try:
-            with smtplib.SMTP(self.smtp.host, self.smtp.port) as server:
+            with smtplib.SMTP(self.smtp.host, self.smtp.port, timeout=30) as server:
                 if self.smtp.use_tls:
                     server.starttls()
                 server.login(self.smtp.username, self.smtp.password)

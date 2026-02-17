@@ -9,8 +9,8 @@ smtp:
   host: smtp.gmail.com
   port: 587
   use_tls: true
-  username: ""
-  password: ""              # Gmail App Password (myaccount.google.com/apppasswords)
+  username: ""              # or set SMTP_USERNAME env var, or use "${SMTP_USERNAME}"
+  password: ""              # Gmail App Password — or set SMTP_PASSWORD env var, or use "${SMTP_PASSWORD}"
   from_name: "Privacy Toolkit"
   from_email: ""
   rate_limit: 10            # Max emails per hour
@@ -30,12 +30,12 @@ scheduling:
 notifications:
   signal:
     enabled: false
-    api_url: http://signal-api:8080
-    sender: ""
+    api_url: http://signal-api:8080  # or set SIGNAL_API_URL env var
+    sender: ""              # or set SIGNAL_SENDER env var
     recipients: []
 
 hibp:
-  api_key: ""               # HaveIBeenPwned API key (https://haveibeenpwned.com/API/Key)
+  api_key: ""               # or set HIBP_API_KEY env var — get one at https://haveibeenpwned.com/API/Key
 
 database:
   path: data/privacy_toolkit.db

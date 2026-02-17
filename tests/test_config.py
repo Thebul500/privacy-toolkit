@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from unittest.mock import patch
 
@@ -11,9 +12,11 @@ import yaml
 from src.config import (
     BROKERS_DIR,
     Config,
+    _resolve_env,
     load_all_brokers,
     load_broker,
     load_profile,
+    validate_broker,
 )
 
 
@@ -168,3 +171,138 @@ class TestMissingConfigFile:
         config = Config.load(empty_file)
         assert config.smtp.host == "smtp.gmail.com"
         assert config.db_path == "data/privacy_toolkit.db"
+
+
+class TestEnvVarResolution:
+    """Test environment variable fallback support in config loading."""
+
+    def test_env_var_resolution(self, tmp_path, monkeypatch):
+        """Empty YAML values should fall back to environment variables."""
+        monkeypatch.setenv("SMTP_PASSWORD", "env-pass-123")
+        monkeypatch.setenv("SMTP_USERNAME", "env-user@example.com")
+        monkeypatch.setenv("HIBP_API_KEY", "env-hibp-key")
+        monkeypatch.setenv("SIGNAL_SENDER", "+15551234567")
+        monkeypatch.setenv("SIGNAL_API_URL", "http://env-signal:9999")
+
+        config_file = tmp_path / "config.yaml"
+        config_file.write_text(yaml.dump({
+            "smtp": {"username": "", "password": ""},
+            "hibp": {"api_key": ""},
+            "notifications": {"signal": {"sender": "", "api_url": ""}},
+        }))
+
+        config = Config.load(config_file)
+
+        assert config.smtp.password == "env-pass-123"
+        assert config.smtp.username == "env-user@example.com"
+        assert config.hibp_api_key == "env-hibp-key"
+        assert config.signal.sender == "+15551234567"
+        assert config.signal.api_url == "http://env-signal:9999"
+
+    def test_env_var_syntax(self, tmp_path, monkeypatch):
+        """Values like ${SMTP_PASSWORD} should resolve from the environment."""
+        monkeypatch.setenv("SMTP_PASSWORD", "dollar-brace-pass")
+        monkeypatch.setenv("HIBP_API_KEY", "dollar-brace-hibp")
+
+        config_file = tmp_path / "config.yaml"
+        config_file.write_text(yaml.dump({
+            "smtp": {"password": "${SMTP_PASSWORD}"},
+            "hibp": {"api_key": "${HIBP_API_KEY}"},
+        }))
+
+        config = Config.load(config_file)
+
+        assert config.smtp.password == "dollar-brace-pass"
+        assert config.hibp_api_key == "dollar-brace-hibp"
+
+    def test_literal_value_unchanged(self, tmp_path, monkeypatch):
+        """Non-empty literal values should pass through without env lookup."""
+        monkeypatch.setenv("SMTP_PASSWORD", "should-be-ignored")
+        monkeypatch.setenv("HIBP_API_KEY", "should-be-ignored")
+
+        config_file = tmp_path / "config.yaml"
+        config_file.write_text(yaml.dump({
+            "smtp": {"password": "my-literal-password", "username": "literal@test.com"},
+            "hibp": {"api_key": "literal-hibp-key"},
+            "notifications": {"signal": {"sender": "+10000000000", "api_url": "http://literal:8080"}},
+        }))
+
+        config = Config.load(config_file)
+
+        assert config.smtp.password == "my-literal-password"
+        assert config.smtp.username == "literal@test.com"
+        assert config.hibp_api_key == "literal-hibp-key"
+        assert config.signal.sender == "+10000000000"
+        assert config.signal.api_url == "http://literal:8080"
+
+
+class TestValidateBroker:
+    """Test the validate_broker() function."""
+
+    def _valid_broker_dict(self) -> dict:
+        """Return a minimal valid broker dict for testing."""
+        return {
+            "slug": "testbroker",
+            "name": "Test Broker",
+            "url": "https://testbroker.example.com",
+            "category": "people_search",
+            "priority": "high",
+            "data_types": ["name", "email"],
+            "opt_out": {
+                "methods": [
+                    {
+                        "type": "email",
+                        "address": "remove@testbroker.example.com",
+                        "template": "ccpa_deletion_request",
+                        "subject": "",
+                    }
+                ],
+                "verification": {"type": "manual"},
+            },
+        }
+
+    def test_validate_broker_valid(self):
+        """A complete broker dict passes with no errors."""
+        data = self._valid_broker_dict()
+        errors = validate_broker(data, "testbroker.yaml")
+        assert errors == []
+
+    def test_validate_broker_missing_slug(self):
+        """Missing slug returns an error."""
+        data = self._valid_broker_dict()
+        del data["slug"]
+        errors = validate_broker(data, "testbroker.yaml")
+        assert any("slug" in e for e in errors)
+
+    def test_validate_broker_bad_priority(self):
+        """Invalid priority returns an error."""
+        data = self._valid_broker_dict()
+        data["priority"] = "urgent"
+        errors = validate_broker(data, "testbroker.yaml")
+        assert any("priority" in e.lower() for e in errors)
+
+    def test_validate_broker_no_methods(self):
+        """Missing opt_out.methods returns an error."""
+        data = self._valid_broker_dict()
+        del data["opt_out"]["methods"]
+        errors = validate_broker(data, "testbroker.yaml")
+        assert any("methods" in e for e in errors)
+
+    def test_validate_broker_bad_method_type(self):
+        """Invalid method type returns an error."""
+        data = self._valid_broker_dict()
+        data["opt_out"]["methods"] = [{"type": "fax"}]
+        errors = validate_broker(data, "testbroker.yaml")
+        assert any("fax" in e for e in errors)
+
+    def test_validate_all_real_brokers(self):
+        """Load all 78 real broker YAMLs and assert all pass validation."""
+        for path in sorted(BROKERS_DIR.glob("*.yaml")):
+            if path.stem.startswith("_"):
+                continue
+            with open(path) as f:
+                data = yaml.safe_load(f) or {}
+            errors = validate_broker(data, path.name)
+            assert errors == [], (
+                f"Broker {path.name} has validation errors: {errors}"
+            )
