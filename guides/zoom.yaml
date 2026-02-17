@@ -1,0 +1,21 @@
+service: Zoom
+url: https://zoom.us
+category: productivity
+deletion_url: https://zoom.us/account
+difficulty: medium
+estimated_time: "5 minutes"
+steps:
+  - "Log in to your Zoom account at https://zoom.us/profile"
+  - "Click Account Management in the left sidebar (or go to Profile if you are a basic user)"
+  - "Click Account Profile"
+  - "Click Terminate My Account at the bottom of the page"
+  - "Click Yes to confirm account termination"
+  - "For basic/free accounts: go to Profile > scroll to the bottom > click Delete My Account"
+  - "Enter your password and click Delete"
+  - "Account deletion is processed immediately"
+notes: "If you are the owner of a paid account, transfer ownership or cancel the subscription before deleting. All scheduled meetings, recordings, and settings will be permanently deleted. Cloud recordings are deleted after 30 days."
+data_retained_after_deletion: "Zoom retains certain data for legal compliance. Recordings shared with others may persist in their accounts."
+alternative_actions:
+  - "Download your cloud recordings before deleting"
+  - "Transfer account ownership if you manage a paid organization"
+  - "Submit a data deletion request: https://zoom.us/gdpr"

@@ -1,0 +1,20 @@
+service: Epic Games
+url: https://www.epicgames.com
+category: gaming
+deletion_url: https://www.epicgames.com/account/personal
+difficulty: hard
+estimated_time: "10 minutes"
+steps:
+  - "Log in to your Epic Games account at https://www.epicgames.com/account/personal"
+  - "Scroll to the bottom of the Account page"
+  - "Click Request Account Delete"
+  - "You will receive a security code via email"
+  - "Enter the security code to confirm the deletion"
+  - "Click Confirm Delete Request"
+  - "Your account enters a 14-day waiting period"
+  - "After 14 days, the account and all data are permanently deleted"
+notes: "You lose access to all purchased games, V-Bucks (Fortnite), and linked accounts. Unlink any connected accounts (PlayStation, Xbox, Nintendo) before deleting. If you have a creator code, it will be deactivated."
+data_retained_after_deletion: "Epic retains certain financial and transaction records as required by law."
+alternative_actions:
+  - "Download your data first: Account Settings > Request a copy of your data"
+  - "Unlink connected accounts before deletion to avoid issues"

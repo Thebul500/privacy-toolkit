@@ -1,0 +1,20 @@
+service: Twitch
+url: https://www.twitch.tv
+category: streaming
+deletion_url: https://www.twitch.tv/settings/delete-account
+difficulty: medium
+estimated_time: "5 minutes"
+steps:
+  - "Log in to your Twitch account at https://www.twitch.tv"
+  - "Click your profile icon in the top right, then select Settings"
+  - "Scroll down and click Disable Your Account or go to https://www.twitch.tv/settings/delete-account"
+  - "Click Delete Account"
+  - "Enter your password to confirm"
+  - "Optionally, select a reason for leaving"
+  - "Click Delete Account to finalize"
+  - "Your account will be permanently deleted after a brief processing period"
+notes: "If you are a Twitch affiliate or partner, you must end your agreement before deleting. Cancel any active subscriptions to other channels first. Channel subscriptions you sold will continue until their billing cycle ends."
+data_retained_after_deletion: "Twitch retains certain data for legal obligations. VODs and clips are deleted with the account."
+alternative_actions:
+  - "Disable your account instead of deleting (recoverable within 90 days)"
+  - "Download your data: Settings > Privacy > Data Request"

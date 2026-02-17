@@ -1,0 +1,17 @@
+service: Yahoo
+url: https://www.yahoo.com
+category: email
+deletion_url: https://login.yahoo.com/account/delete-user
+difficulty: medium
+estimated_time: "5 minutes"
+steps:
+  - "Go to https://login.yahoo.com/account/delete-user"
+  - "Log in with your Yahoo credentials"
+  - "Review the information about what will be deleted (Yahoo Mail, Flickr, Fantasy Sports, etc.)"
+  - "Enter your email address in the confirmation field"
+  - "Click Yes, terminate this account"
+  - "Your account will be deactivated immediately and permanently deleted after 40 days"
+notes: "Your Yahoo email address may become available to others after deletion. All Yahoo services linked to the account will be terminated. Flickr accounts with a paid subscription should be cancelled first."
+data_retained_after_deletion: "Yahoo retains certain records for legal and business purposes as described in their privacy policy."
+alternative_actions:
+  - "Download your data before deletion through Yahoo account settings"

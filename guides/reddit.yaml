@@ -1,0 +1,19 @@
+service: Reddit
+url: https://www.reddit.com
+category: social
+deletion_url: https://www.reddit.com/settings/account
+difficulty: medium
+estimated_time: "5 minutes"
+steps:
+  - "Log in to your Reddit account at https://www.reddit.com"
+  - "Go to https://www.reddit.com/settings/account"
+  - "Scroll to the bottom of the page and click Delete Account"
+  - "Enter your username and password to verify"
+  - "Check the box acknowledging that deleted accounts are not recoverable"
+  - "Click Delete"
+  - "Account deletion is immediate and permanent"
+notes: "Deletion is PERMANENT and cannot be undone. Your posts and comments remain but are attributed to [deleted]. Delete individual posts and comments manually before deleting your account if you want them removed."
+data_retained_after_deletion: "Posts and comments remain visible under the [deleted] username. Reddit retains certain logs for legal compliance."
+alternative_actions:
+  - "Use a script to bulk-delete/overwrite your comments and posts before deleting the account"
+  - "Request a data export: https://www.reddit.com/settings/data-request"

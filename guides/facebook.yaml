@@ -1,0 +1,21 @@
+service: Facebook
+url: https://www.facebook.com
+category: social
+deletion_url: https://www.facebook.com/help/delete_account
+difficulty: medium
+estimated_time: "5 minutes"
+steps:
+  - "Log in to your Facebook account at https://www.facebook.com"
+  - "Click your profile picture in the top right, then select Settings & privacy > Settings"
+  - "In the left sidebar, click Accounts Center, then select Personal details"
+  - "Click Account ownership and control > Deactivation or deletion"
+  - "Select the Facebook account you want to delete"
+  - "Choose Delete account and click Continue"
+  - "Enter your password when prompted and click Continue"
+  - "Click Delete Account to confirm"
+  - "Check your email for a confirmation — you have 30 days to cancel"
+notes: "Your account enters a 30-day grace period before permanent deletion. Logging back in during this period cancels the deletion. Messenger is also deleted."
+data_retained_after_deletion: "Some data like messages sent to others may remain visible to them. Anonymized analytics may be retained."
+alternative_actions:
+  - "Download your data first: https://www.facebook.com/dyi"
+  - "Deactivate instead of delete to hide your profile temporarily"

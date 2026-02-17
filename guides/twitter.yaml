@@ -1,0 +1,20 @@
+service: X (formerly Twitter)
+url: https://x.com
+category: social
+deletion_url: https://x.com/settings/deactivate
+difficulty: medium
+estimated_time: "3 minutes"
+steps:
+  - "Log in to your account at https://x.com"
+  - "Click More in the left sidebar, then select Settings and Support > Settings and privacy"
+  - "Click Your account > Deactivate your account"
+  - "Review the information about deactivation"
+  - "Click Deactivate at the bottom of the page"
+  - "Enter your password to confirm"
+  - "Click Deactivate to finalize"
+  - "Your account will be permanently deleted after 30 days of deactivation"
+notes: "Logging back in within 30 days reactivates your account. After 30 days, the account and all data are permanently deleted. Your username becomes available again."
+data_retained_after_deletion: "Some content may remain in search engine caches. X retains certain data as required by law."
+alternative_actions:
+  - "Download your data first: https://x.com/settings/download_your_data"
+  - "Protect your tweets (make private) instead of deleting"

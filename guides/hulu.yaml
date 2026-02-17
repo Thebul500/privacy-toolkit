@@ -1,0 +1,19 @@
+service: Hulu
+url: https://www.hulu.com
+category: streaming
+deletion_url: https://secure.hulu.com/account
+difficulty: medium
+estimated_time: "5 minutes"
+steps:
+  - "Log in to your Hulu account at https://www.hulu.com"
+  - "Go to Account (click your name > Account)"
+  - "Click Cancel Your Subscription under Your Subscription"
+  - "Follow the prompts to confirm cancellation"
+  - "After cancellation, contact Hulu support to request permanent account deletion"
+  - "Call 1-888-265-6650 or use the chat at https://help.hulu.com/contact"
+  - "Request that your account and all associated data be permanently deleted"
+notes: "Hulu does not have a self-service account deletion option. You must cancel your subscription and then contact support. If you subscribed through a third party (Disney Bundle, Spotify, etc.), cancel through that provider first."
+data_retained_after_deletion: "Hulu retains financial transaction records as required by law."
+alternative_actions:
+  - "Pause your subscription instead of cancelling"
+  - "Delete profiles: Account > Profiles > Delete"

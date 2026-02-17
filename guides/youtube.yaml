@@ -1,0 +1,21 @@
+service: YouTube
+url: https://www.youtube.com
+category: streaming
+deletion_url: https://myaccount.google.com/delete-services-or-account
+difficulty: medium
+estimated_time: "5 minutes"
+steps:
+  - "Log in to your Google account at https://myaccount.google.com"
+  - "Go to https://myaccount.google.com/delete-services-or-account"
+  - "Click Delete a Google service"
+  - "Re-enter your password if prompted"
+  - "Click the trash icon next to YouTube"
+  - "You may be asked to transfer your YouTube channel to a Brand Account or confirm deletion"
+  - "Check the box confirming you want to delete your YouTube content"
+  - "Click Delete My Content"
+notes: "This deletes only your YouTube channel and content, not your entire Google account. All videos, playlists, comments, and subscriptions are permanently deleted. YouTube Premium or Music subscriptions should be cancelled first."
+data_retained_after_deletion: "Comments you made on other channels may remain. Google retains certain data for legal compliance."
+alternative_actions:
+  - "Download your data first: https://takeout.google.com (select YouTube)"
+  - "Make your channel private instead of deleting: YouTube Studio > Settings > Channel > Advanced > Hide channel"
+  - "Delete your entire Google account instead if you want everything removed"

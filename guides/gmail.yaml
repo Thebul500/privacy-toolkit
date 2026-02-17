@@ -1,0 +1,21 @@
+service: Google Account
+url: https://myaccount.google.com
+category: email
+deletion_url: https://myaccount.google.com/delete-services-or-account
+difficulty: medium
+estimated_time: "10 minutes"
+steps:
+  - "Log in to your Google account at https://myaccount.google.com"
+  - "Go to https://myaccount.google.com/delete-services-or-account"
+  - "To delete just Gmail: click Delete a Google service, then click the trash icon next to Gmail"
+  - "To delete your entire Google account: click Delete your Google Account"
+  - "Review the list of services and data that will be deleted"
+  - "Check both acknowledgment boxes at the bottom"
+  - "Click Delete Account"
+  - "You may need to re-enter your password and verify via phone"
+notes: "Deleting your Google account removes Gmail, Drive, Photos, YouTube, and all other Google services. You can delete individual services instead. Account recovery is possible for a limited time after deletion."
+data_retained_after_deletion: "Google may retain certain data for legal obligations. Financial transaction records are kept as required by law."
+alternative_actions:
+  - "Download your data first: https://takeout.google.com"
+  - "Delete only Gmail while keeping your Google account"
+  - "Remove specific services individually instead of the entire account"

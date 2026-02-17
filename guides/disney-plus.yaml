@@ -1,0 +1,21 @@
+service: Disney+
+url: https://www.disneyplus.com
+category: streaming
+deletion_url: https://www.disneyplus.com/account
+difficulty: medium
+estimated_time: "10 minutes"
+steps:
+  - "Log in to your Disney+ account at https://www.disneyplus.com"
+  - "Go to Account (click your profile icon > Account)"
+  - "Cancel your subscription first"
+  - "To delete your Disney account entirely, go to https://privacy.thewaltdisneycompany.com/en/dsar/"
+  - "Select Account Deletion"
+  - "Log in with your Disney account credentials"
+  - "Confirm the deletion request"
+  - "This deletes your Disney account across all Disney services (Disney+, Hulu, ESPN+, etc.)"
+  - "Check your email for confirmation"
+notes: "Deleting your Disney account affects ALL Disney services including Disney+, Hulu, ESPN+, and Star Wars/Marvel accounts. Cancel all subscriptions before requesting deletion. Processing may take up to 30 days."
+data_retained_after_deletion: "Disney retains certain data for legal compliance and fraud prevention purposes."
+alternative_actions:
+  - "Download your data first: https://privacy.thewaltdisneycompany.com/en/dsar/ (select Data Download)"
+  - "Cancel subscription only and keep the account dormant"

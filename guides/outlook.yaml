@@ -1,0 +1,20 @@
+service: Microsoft Account (Outlook)
+url: https://account.microsoft.com
+category: email
+deletion_url: https://account.live.com/closeaccount.aspx
+difficulty: medium
+estimated_time: "10 minutes"
+steps:
+  - "Log in to your Microsoft account at https://account.microsoft.com"
+  - "Go to https://account.live.com/closeaccount.aspx"
+  - "Verify your identity if prompted"
+  - "Review the list of consequences (Outlook email, OneDrive, Xbox, Skype, etc.)"
+  - "Check each acknowledgment checkbox on the page"
+  - "Select a reason for closing your account"
+  - "Click Mark account for closure"
+  - "Your account enters a 60-day waiting period before permanent deletion"
+notes: "Closing your Microsoft account affects all Microsoft services including Outlook, OneDrive, Xbox, Skype, and Microsoft 365. Cancel all subscriptions first. You have 60 days to reopen the account."
+data_retained_after_deletion: "After the 60-day period, data is permanently deleted. Microsoft retains certain records for legal compliance."
+alternative_actions:
+  - "Download your data first: https://account.microsoft.com/privacy"
+  - "Remove Outlook alias only while keeping the Microsoft account"

@@ -1,0 +1,18 @@
+service: eBay
+url: https://www.ebay.com
+category: shopping
+deletion_url: https://www.ebay.com/help/account/closing-account/closing-your-ebay-account?id=4006
+difficulty: medium
+estimated_time: "5 minutes"
+steps:
+  - "Log in to your eBay account at https://www.ebay.com"
+  - "Resolve any outstanding transactions, unpaid items, or active listings"
+  - "Go to Account Settings > Close Account (or navigate to https://www.ebay.com/help/account/closing-account/closing-your-ebay-account?id=4006)"
+  - "Click Close Your Account"
+  - "Select a reason for closing"
+  - "Click Close Account to confirm"
+  - "eBay will send a confirmation email"
+notes: "You cannot close your account if you have active listings, pending transactions, or outstanding balances. Cancel all active listings and resolve any buyer/seller disputes first. Your seller reputation history is permanently lost."
+data_retained_after_deletion: "eBay retains transaction records for legal and regulatory compliance. Feedback you left for others remains visible."
+alternative_actions:
+  - "Remove all listings and personal information manually before closing"

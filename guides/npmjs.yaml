@@ -1,0 +1,21 @@
+service: npm
+url: https://www.npmjs.com
+category: developer
+deletion_url: https://www.npmjs.com/settings/~/delete
+difficulty: medium
+estimated_time: "5 minutes"
+steps:
+  - "Log in to your npm account at https://www.npmjs.com"
+  - "Go to Account Settings (click your avatar > Account)"
+  - "Or navigate to https://www.npmjs.com/settings/~/delete"
+  - "Scroll down to the Delete Account section"
+  - "If you have published packages, transfer ownership or unpublish them first"
+  - "Type your username to confirm"
+  - "Click Delete Account"
+  - "Your account is deleted immediately"
+notes: "Published packages are NOT automatically deleted when you delete your account. Transfer ownership of packages to a maintainer or unpublish them before deleting your account. Packages with dependents cannot be unpublished after 72 hours — contact npm support for those cases."
+data_retained_after_deletion: "Published packages remain in the npm registry even after account deletion unless explicitly unpublished. Download counts and metadata are retained."
+alternative_actions:
+  - "Transfer package ownership: npm owner add <user> <package>"
+  - "Unpublish packages within 72 hours: npm unpublish <package> --force"
+  - "Contact npm support for packages older than 72 hours: https://www.npmjs.com/support"

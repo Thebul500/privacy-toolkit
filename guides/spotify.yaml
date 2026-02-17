@@ -1,0 +1,21 @@
+service: Spotify
+url: https://www.spotify.com
+category: streaming
+deletion_url: https://support.spotify.com/contact-spotify-account-privacy/
+difficulty: medium
+estimated_time: "5 minutes"
+steps:
+  - "Log in to your Spotify account at https://www.spotify.com/account"
+  - "Cancel any Premium subscription first: Account > Subscription > Cancel Premium"
+  - "Go to https://support.spotify.com/contact-spotify-account-privacy/"
+  - "Alternatively, navigate to Account > Privacy Settings > Close your account"
+  - "Click I want to close my account"
+  - "Review the information about what will be lost (playlists, followers, listening history)"
+  - "Click Close Account"
+  - "Check your email for a confirmation link and click it within 7 days"
+  - "Your account will be permanently closed"
+notes: "Cancel your Premium subscription before closing your account to avoid additional charges. Collaborative playlists you created will become owned by another collaborator. Your username cannot be reused."
+data_retained_after_deletion: "Spotify may retain certain data for legal obligations and royalty calculations."
+alternative_actions:
+  - "Download your data first: Account > Privacy Settings > Download your data"
+  - "Downgrade to free tier instead of deleting"

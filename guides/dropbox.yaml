@@ -1,0 +1,18 @@
+service: Dropbox
+url: https://www.dropbox.com
+category: cloud
+deletion_url: https://www.dropbox.com/account/delete
+difficulty: medium
+estimated_time: "5 minutes"
+steps:
+  - "Log in to your Dropbox account at https://www.dropbox.com"
+  - "Go to https://www.dropbox.com/account/delete"
+  - "Select a reason for deleting your account"
+  - "Enter your password to confirm"
+  - "Click Permanently delete"
+  - "Check your email for a confirmation link and click it to finalize deletion"
+notes: "Files in shared folders will remain accessible to other members. Cancel any paid subscriptions before deleting. Files on your local computer are not affected, but syncing stops."
+data_retained_after_deletion: "Dropbox retains account data for a limited period for recovery purposes. Shared folder data remains for other participants."
+alternative_actions:
+  - "Download your files from the Dropbox desktop app or web interface before deleting"
+  - "Downgrade to a free plan instead of deleting"

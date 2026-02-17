@@ -1,0 +1,22 @@
+service: Adobe
+url: https://www.adobe.com
+category: productivity
+deletion_url: https://account.adobe.com/privacy
+difficulty: hard
+estimated_time: "10 minutes"
+steps:
+  - "Log in to your Adobe account at https://account.adobe.com"
+  - "Cancel any active subscriptions first: Plans > Manage Plan > Cancel Plan"
+  - "Note: early cancellation of annual plans incurs a fee"
+  - "Go to https://account.adobe.com/privacy"
+  - "Click Delete account under the Account management section"
+  - "Review the information about what will be deleted (Creative Cloud files, Lightroom photos, Behance portfolio, etc.)"
+  - "Confirm your password"
+  - "Click Continue and then Delete Account"
+  - "Adobe processes the deletion within 30 days"
+notes: "Cancel all subscriptions before deleting to avoid charges. Early termination fees may apply for annual plans. All Creative Cloud files, Lightroom libraries, Fonts, Behance portfolios, and Stock licenses are permanently lost. Download everything you need before proceeding."
+data_retained_after_deletion: "Adobe retains financial transaction records and data required by law. Content shared publicly on Behance may remain cached."
+alternative_actions:
+  - "Download your Creative Cloud files before deleting"
+  - "Export your Lightroom catalog and photos locally"
+  - "Cancel subscriptions and let the account go dormant instead"

@@ -1,0 +1,22 @@
+service: GitHub
+url: https://github.com
+category: developer
+deletion_url: https://github.com/settings/admin
+difficulty: medium
+estimated_time: "5 minutes"
+steps:
+  - "Log in to your GitHub account at https://github.com"
+  - "Go to Settings (click your profile photo > Settings)"
+  - "Click Account in the left sidebar (or go to https://github.com/settings/admin)"
+  - "Scroll to the bottom to the Danger Zone section"
+  - "Click Delete your account"
+  - "Read the warnings about losing repositories, issues, pull requests, and contributions"
+  - "Type your username in the confirmation field"
+  - "Enter your password or confirm with 2FA"
+  - "Click Cancel plan and delete this account"
+notes: "All repositories, issues, pull requests, gists, and contributions are permanently deleted. If you are the sole owner of any organizations, you must delete or transfer them first. Forked repositories become independent. npm packages you own are NOT deleted — handle those separately."
+data_retained_after_deletion: "Contributions to other people's repositories (issues, PRs, comments) remain but are attributed to a ghost user. Git commits in others' repos retain your name/email from the commit metadata."
+alternative_actions:
+  - "Download your data first: Settings > Archives > Export account data"
+  - "Transfer repository ownership before deleting"
+  - "Make repositories private instead of deleting everything"

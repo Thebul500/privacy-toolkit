@@ -1,0 +1,18 @@
+service: Tumblr
+url: https://www.tumblr.com
+category: social
+deletion_url: https://www.tumblr.com/settings/account
+difficulty: easy
+estimated_time: "2 minutes"
+steps:
+  - "Log in to your Tumblr account at https://www.tumblr.com"
+  - "Click your profile icon and select Settings"
+  - "Scroll to the bottom of the Account settings page"
+  - "Click Delete account"
+  - "Enter your email address and password to confirm"
+  - "Click Delete everything"
+  - "Account and all blogs are deleted immediately"
+notes: "Deletion is immediate and permanent. All blogs associated with the account are deleted. If you only want to delete a secondary blog, do that separately from the blog settings."
+data_retained_after_deletion: "Reblogs of your posts by other users will remain on their blogs."
+alternative_actions:
+  - "Export your blog first: Settings > select blog > Export"

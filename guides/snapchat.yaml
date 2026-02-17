@@ -1,0 +1,16 @@
+service: Snapchat
+url: https://www.snapchat.com
+category: social
+deletion_url: https://accounts.snapchat.com/accounts/delete_account
+difficulty: medium
+estimated_time: "3 minutes"
+steps:
+  - "Go to https://accounts.snapchat.com/accounts/delete_account"
+  - "Log in with your Snapchat credentials"
+  - "Your account will be deactivated immediately"
+  - "After 30 days of deactivation, your account is permanently deleted"
+  - "Do not log back in during the 30-day period or the deletion is cancelled"
+notes: "Account is deactivated for 30 days before permanent deletion. Friends will not be able to contact or interact with you during deactivation. Snapchat+ subscriptions must be cancelled separately."
+data_retained_after_deletion: "Snaps sent to others may still be viewable. Snapchat retains certain data for legal compliance."
+alternative_actions:
+  - "Download your data first: https://accounts.snapchat.com/accounts/downloadmydata"

@@ -1,0 +1,20 @@
+service: PayPal
+url: https://www.paypal.com
+category: finance
+deletion_url: https://www.paypal.com/myaccount/settings/
+difficulty: medium
+estimated_time: "5 minutes"
+steps:
+  - "Log in to your PayPal account at https://www.paypal.com"
+  - "Resolve any pending transactions, disputes, or limitations on your account"
+  - "Withdraw your remaining PayPal balance to your bank account"
+  - "Remove all linked bank accounts and cards"
+  - "Go to Settings (gear icon) > Account Settings"
+  - "Click Close your account at the bottom"
+  - "Confirm by clicking Close Account"
+  - "PayPal will send a confirmation email"
+notes: "You cannot close your account if you have pending transactions, open disputes, a negative balance, or active subscriptions billing through PayPal. Cancel all recurring payments first. Withdraw your full balance before closing."
+data_retained_after_deletion: "PayPal retains transaction records for up to 10 years as required by financial regulations."
+alternative_actions:
+  - "Download your transaction history: Activity > Statements > Custom Date Range > Download"
+  - "Remove all linked funding sources before closing"

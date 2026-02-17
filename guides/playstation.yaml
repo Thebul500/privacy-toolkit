@@ -1,0 +1,20 @@
+service: PlayStation Network (PSN)
+url: https://www.playstation.com
+category: gaming
+deletion_url: https://www.playstation.com/support/account/close-account/
+difficulty: hard
+estimated_time: "15 minutes"
+steps:
+  - "Contact PlayStation Support at https://www.playstation.com/support/"
+  - "Select Account & Security > Close Account"
+  - "Choose to chat with an agent or call support"
+  - "You can also call PlayStation Support directly: 1-800-345-7669"
+  - "Verify your identity with the support agent"
+  - "Request permanent account closure and data deletion"
+  - "The agent will process your request and send a confirmation email"
+  - "Account closure is processed within a few business days"
+notes: "PSN accounts cannot be deleted through self-service. You must contact support. You permanently lose access to all digital purchases, trophies, and PlayStation Plus benefits. Wallet funds are forfeited. Ensure all subscriptions are cancelled first."
+data_retained_after_deletion: "Sony retains transaction records for legal compliance. Trophy data associated with other players' records may persist."
+alternative_actions:
+  - "Remove payment methods first: Settings > Account Management > Account Information > Wallet > Payment Methods"
+  - "Deactivate consoles before closing: Settings > Account Management > Activate as Your Primary PS"

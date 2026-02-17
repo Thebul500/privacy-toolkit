@@ -1,0 +1,21 @@
+service: Stack Overflow
+url: https://stackoverflow.com
+category: developer
+deletion_url: https://stackoverflow.com/users/delete/current
+difficulty: medium
+estimated_time: "5 minutes"
+steps:
+  - "Log in to your Stack Overflow account at https://stackoverflow.com"
+  - "Go to your profile: click your avatar in the top bar"
+  - "Click Edit profile and settings > Delete profile"
+  - "Or navigate directly to https://stackoverflow.com/users/delete/current"
+  - "Review the information about what will happen to your content"
+  - "If eligible, choose between deleting your profile or requesting dissociation"
+  - "Click Delete profile to confirm"
+  - "Enter your password or confirm with your identity provider"
+notes: "If you have posted content with a positive score or accepted answers, self-deletion may not be available. In that case, contact Stack Overflow support via the contact form to request deletion. Content licensed under CC BY-SA may remain attributed to an anonymous user."
+data_retained_after_deletion: "Your questions and answers remain on the site but are attributed to an anonymous user. Content is retained under the CC BY-SA license."
+alternative_actions:
+  - "Request dissociation: your content stays but is no longer linked to your name"
+  - "Manually delete your questions and answers (if no accepted answers) before deleting your profile"
+  - "Contact support: https://stackoverflow.com/contact for complex cases"

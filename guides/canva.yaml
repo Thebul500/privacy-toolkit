@@ -1,0 +1,20 @@
+service: Canva
+url: https://www.canva.com
+category: productivity
+deletion_url: https://www.canva.com/settings/account
+difficulty: easy
+estimated_time: "3 minutes"
+steps:
+  - "Log in to your Canva account at https://www.canva.com"
+  - "Click the gear icon or go to Account Settings"
+  - "Scroll down to the Login & security section"
+  - "Click Delete account"
+  - "Select a reason for deleting"
+  - "Enter your password to confirm"
+  - "Click Continue and then Delete account"
+  - "Account and all designs are permanently deleted within 14 days"
+notes: "If you are on a Canva for Teams plan, the team owner must remove you or you must leave the team first. Cancel any Canva Pro subscription before deleting. All your designs, uploads, and brand kits are permanently deleted."
+data_retained_after_deletion: "Designs shared with others may remain in their accounts. Canva retains certain data for legal compliance."
+alternative_actions:
+  - "Download your designs first: select designs > Download"
+  - "Transfer team ownership before deleting if you are a team admin"

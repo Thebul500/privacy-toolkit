@@ -1,0 +1,20 @@
+service: LinkedIn
+url: https://www.linkedin.com
+category: social
+deletion_url: https://www.linkedin.com/help/linkedin/answer/63/closing-your-linkedin-account
+difficulty: medium
+estimated_time: "5 minutes"
+steps:
+  - "Log in to your LinkedIn account at https://www.linkedin.com"
+  - "Click your profile picture in the top right, then select Settings & Privacy"
+  - "Under Account management, click Close account"
+  - "Select a reason for closing your account from the list"
+  - "Click Next"
+  - "Enter your password to confirm"
+  - "Click Close Account"
+  - "Check your email for a confirmation message"
+notes: "LinkedIn retains your data for up to 30 days after closure. Premium subscriptions should be cancelled separately before closing your account."
+data_retained_after_deletion: "Anonymized and aggregated data may be kept. Messages sent to others remain in their inboxes."
+alternative_actions:
+  - "Download your data first: Settings & Privacy > Get a copy of your data"
+  - "Hibernate your account to hide your profile without deleting"

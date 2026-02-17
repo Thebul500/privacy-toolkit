@@ -1,0 +1,21 @@
+service: Xbox (Microsoft Account)
+url: https://www.xbox.com
+category: gaming
+deletion_url: https://account.live.com/closeaccount.aspx
+difficulty: medium
+estimated_time: "10 minutes"
+steps:
+  - "Log in to your Microsoft account at https://account.microsoft.com"
+  - "Go to https://account.live.com/closeaccount.aspx"
+  - "Verify your identity if prompted"
+  - "Review the list of consequences — this closes your entire Microsoft account (Xbox, Outlook, OneDrive, etc.)"
+  - "Check all the acknowledgment checkboxes"
+  - "Select a reason for closing"
+  - "Click Mark account for closure"
+  - "Your account enters a 60-day waiting period before permanent deletion"
+notes: "Closing your Microsoft account deletes ALL Microsoft services, not just Xbox. You lose access to all digital game purchases, Game Pass, Xbox Live Gold, and achievements. There is no way to delete just the Xbox portion without closing the entire Microsoft account."
+data_retained_after_deletion: "Microsoft retains certain data for legal compliance. After the 60-day grace period, data is permanently deleted."
+alternative_actions:
+  - "Download your data first: https://account.microsoft.com/privacy"
+  - "Remove your Xbox profile from consoles before closing"
+  - "Cancel Game Pass and other subscriptions first"

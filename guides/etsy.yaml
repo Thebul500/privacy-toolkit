@@ -1,0 +1,19 @@
+service: Etsy
+url: https://www.etsy.com
+category: shopping
+deletion_url: https://www.etsy.com/your/account/privacy
+difficulty: medium
+estimated_time: "5 minutes"
+steps:
+  - "Log in to your Etsy account at https://www.etsy.com"
+  - "Go to Account Settings (click your profile icon > Account settings)"
+  - "Scroll down and click Close your account or go to Privacy settings"
+  - "Click Request to close your account"
+  - "If you have an active shop, you must close it first: Shop Manager > Settings > Close Shop"
+  - "Select a reason for closing and click Close Account"
+  - "Confirm by clicking Close Account again"
+notes: "You must close any active Etsy shop before closing your account. Pending orders must be completed or cancelled. Etsy Payments balances must be at $0."
+data_retained_after_deletion: "Transaction records and reviews you left may be retained. Etsy keeps financial data for legal compliance."
+alternative_actions:
+  - "Download your data first: Account Settings > Privacy > Download Your Data"
+  - "Close your shop but keep your buyer account"

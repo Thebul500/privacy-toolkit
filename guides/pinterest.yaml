@@ -1,0 +1,20 @@
+service: Pinterest
+url: https://www.pinterest.com
+category: social
+deletion_url: https://www.pinterest.com/settings/privacy
+difficulty: easy
+estimated_time: "3 minutes"
+steps:
+  - "Log in to your Pinterest account at https://www.pinterest.com"
+  - "Click the three dots menu in the top right, then select Settings"
+  - "Click Account management"
+  - "Click Delete your data and account"
+  - "Select a reason and click Continue"
+  - "Click Send delete email"
+  - "Open the confirmation email from Pinterest and click the deletion link"
+  - "Your account will be permanently deleted after 14 days"
+notes: "You have 14 days to cancel by logging back in. After 14 days, all pins, boards, and data are permanently deleted."
+data_retained_after_deletion: "Anonymized and aggregated analytics data may be retained."
+alternative_actions:
+  - "Deactivate your account instead: Settings > Account management > Deactivate account"
+  - "Request your data: Settings > Privacy and data > Request your data"

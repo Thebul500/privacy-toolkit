@@ -1,0 +1,21 @@
+service: Amazon
+url: https://www.amazon.com
+category: shopping
+deletion_url: https://www.amazon.com/privacy/data-deletion
+difficulty: hard
+estimated_time: "10 minutes"
+steps:
+  - "Log in to your Amazon account at https://www.amazon.com"
+  - "Go to https://www.amazon.com/privacy/data-deletion"
+  - "Alternatively, go to Help > Need More Help? > Contact Us and request account closure"
+  - "Select Close My Amazon Account"
+  - "Review the warnings about losing access to orders, digital content, gift card balances, etc."
+  - "Check the confirmation box and click Close My Account"
+  - "Amazon will send a confirmation email — click the link to confirm"
+  - "Account closure takes effect after a brief processing period"
+notes: "You lose access to all digital purchases (Kindle books, Audible, Prime Video). Gift card balances are forfeited. Cancel all subscriptions including Prime first. Consider separate Alexa/Ring data deletion requests."
+data_retained_after_deletion: "Amazon retains financial transaction records as required by law. Some data may be retained for fraud prevention."
+alternative_actions:
+  - "Download your data first: https://www.amazon.com/hz/privacy-central/data-requests/preview.html"
+  - "Cancel Prime subscription separately before closing account"
+  - "Deregister Alexa devices and delete voice recordings first"

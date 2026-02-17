@@ -1,0 +1,18 @@
+service: TikTok
+url: https://www.tiktok.com
+category: social
+deletion_url: https://www.tiktok.com/setting/account
+difficulty: easy
+estimated_time: "3 minutes"
+steps:
+  - "Open the TikTok app or go to https://www.tiktok.com and log in"
+  - "Go to Profile > Menu (three lines) > Settings and privacy"
+  - "Tap Manage account > Delete account"
+  - "Follow the on-screen prompts and verify your identity"
+  - "Tap Delete account to confirm"
+  - "Your account enters a 30-day deactivation period before permanent deletion"
+notes: "Account is recoverable within 30 days by logging back in. Any virtual currency or items will be lost. Active subscriptions should be cancelled first."
+data_retained_after_deletion: "TikTok may retain certain data for legal and safety purposes as described in their privacy policy."
+alternative_actions:
+  - "Download your data first: Settings > Privacy > Download your data"
+  - "Set your account to private instead of deleting"

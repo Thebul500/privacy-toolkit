@@ -1,0 +1,19 @@
+service: Discord
+url: https://discord.com
+category: social
+deletion_url: https://discord.com/app
+difficulty: medium
+estimated_time: "5 minutes"
+steps:
+  - "Log in to Discord at https://discord.com/app or open the desktop app"
+  - "Click the gear icon next to your username to open User Settings"
+  - "Scroll down and click My Account"
+  - "Scroll to the bottom and click Delete Account"
+  - "Enter your password (and 2FA code if enabled)"
+  - "Click Delete Account to confirm"
+  - "Account is scheduled for deletion and will be purged after 14-30 days"
+notes: "If you own any servers, you must transfer ownership or delete them before deleting your account. Account deletion may take 14-30 days to fully process. You cannot reuse the email for a new account during this period."
+data_retained_after_deletion: "Messages you sent in servers remain visible. DMs may persist in other users' inboxes."
+alternative_actions:
+  - "Disable your account instead: User Settings > My Account > Disable Account"
+  - "Request your data: User Settings > Privacy & Safety > Request all of my Data"

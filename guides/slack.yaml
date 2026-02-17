@@ -1,0 +1,20 @@
+service: Slack
+url: https://slack.com
+category: productivity
+deletion_url: https://my.slack.com/account/settings
+difficulty: medium
+estimated_time: "5 minutes"
+steps:
+  - "Log in to Slack at https://slack.com"
+  - "Go to your profile icon > Profile > click the three dots menu > Account settings"
+  - "Or navigate directly to https://my.slack.com/account/settings"
+  - "Scroll to the bottom and click Deactivate Account"
+  - "Check the confirmation box and click Deactivate my Account"
+  - "Note: this deactivates your account in that specific workspace"
+  - "Repeat for each workspace you belong to"
+  - "To fully delete your account, contact Slack support and request permanent data deletion"
+notes: "Slack deactivation is per-workspace, not global. Workspace owners can reactivate your account. For true deletion of all data across all workspaces, you must submit a data deletion request to Slack support. Only workspace owners/admins can delete an entire workspace."
+data_retained_after_deletion: "Your messages remain in the workspace after deactivation. Workspace owners can export and retain all data."
+alternative_actions:
+  - "Export your data: Workspace Settings > Import/Export Data (workspace owner only)"
+  - "Submit a GDPR/CCPA deletion request to privacy@slack.com for full data removal"

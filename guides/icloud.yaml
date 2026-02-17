@@ -1,0 +1,22 @@
+service: iCloud (Apple ID)
+url: https://appleid.apple.com
+category: cloud
+deletion_url: https://privacy.apple.com
+difficulty: hard
+estimated_time: "15 minutes"
+steps:
+  - "Go to https://privacy.apple.com and sign in with your Apple ID"
+  - "Click Request to delete your account"
+  - "Select a reason for deletion"
+  - "Review the information about what will be deleted (iCloud, App Store purchases, Apple Music, etc.)"
+  - "Choose how Apple should send you status updates about the request"
+  - "Review the deletion terms and click Continue"
+  - "You will receive a unique access code — save this to check the status of your request"
+  - "Click Delete Account to confirm"
+  - "Account deletion takes up to 7 days to process"
+notes: "Deleting your Apple ID removes access to ALL Apple services including iCloud, App Store, Apple Music, iMessage, and FaceTime. Any active subscriptions will be cancelled. This cannot be undone after the 7-day processing period."
+data_retained_after_deletion: "Apple may retain certain data required by law. Financial transaction records are kept per regulatory requirements."
+alternative_actions:
+  - "Download your data first: https://privacy.apple.com (Request a copy of your data)"
+  - "Sign out of iCloud on all devices before initiating deletion"
+  - "Deactivate your account temporarily instead of deleting"

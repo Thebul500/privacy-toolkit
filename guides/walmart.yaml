@@ -1,0 +1,19 @@
+service: Walmart
+url: https://www.walmart.com
+category: shopping
+deletion_url: https://www.walmart.com/account/api/ccpa-intake
+difficulty: medium
+estimated_time: "5 minutes"
+steps:
+  - "Log in to your Walmart account at https://www.walmart.com"
+  - "Go to Account > Privacy (or visit https://www.walmart.com/account/api/ccpa-intake)"
+  - "Click Request Account Deletion or Submit a Privacy Request"
+  - "Select Delete My Account"
+  - "Verify your identity through the prompted method (email or phone)"
+  - "Submit the deletion request"
+  - "Walmart will process the request within 15-45 days and send email confirmation"
+notes: "Pending orders should be completed before requesting deletion. Walmart+ subscription should be cancelled first. Pharmacy records may be retained as required by law."
+data_retained_after_deletion: "Pharmacy and health records are retained as required by law. Financial transaction records are kept for legal compliance."
+alternative_actions:
+  - "Cancel Walmart+ subscription before deleting: https://www.walmart.com/plus/manage"
+  - "Submit a data download request before deletion"

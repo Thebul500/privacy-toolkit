@@ -1,0 +1,19 @@
+service: WhatsApp
+url: https://www.whatsapp.com
+category: email
+deletion_url: https://www.whatsapp.com/contact/nocrypt/
+difficulty: easy
+estimated_time: "3 minutes"
+steps:
+  - "Open WhatsApp on your phone"
+  - "Go to Settings > Account > Delete my account"
+  - "Enter your phone number in full international format"
+  - "Select a reason for deleting your account from the dropdown"
+  - "Tap Delete my account"
+  - "Tap Delete my account again to confirm"
+  - "Account and message history are deleted immediately"
+notes: "Deletion is permanent and cannot be undone. You will be removed from all groups. Your messages on other people's devices are not deleted. Back up your chat history before proceeding if needed."
+data_retained_after_deletion: "Messages already delivered to recipients remain on their devices. WhatsApp may retain certain metadata for legal compliance."
+alternative_actions:
+  - "Export individual chats first: Open chat > More > Export chat"
+  - "Back up to Google Drive or iCloud before deleting"

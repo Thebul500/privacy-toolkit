@@ -3,6 +3,7 @@
 from __future__ import annotations
 import asyncio
 import json
+import logging
 import os
 import subprocess
 import sys
@@ -14,6 +15,7 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.table import Table
+from rich.text import Text
 
 from src.config import (
     BROKERS_DIR, Config, PROFILES_DIR, TOOLKIT_DIR,
@@ -22,6 +24,8 @@ from src.config import (
 )
 from src.db import Database
 from src.models import Profile
+
+logger = logging.getLogger(__name__)
 
 console = Console()
 
@@ -364,6 +368,549 @@ def scan_spiderfoot(ctx):
             console.print(f"[green]Running at http://localhost:{sf.port}[/green]")
         else:
             console.print("[red]Failed to start.[/red]")
+
+
+# ============================================================================
+# ACCOUNTS COMMANDS
+# ============================================================================
+
+@cli.group()
+def accounts():
+    """Discover accounts, breaches, and exposures with interactive removal guidance."""
+    pass
+
+
+@accounts.command("find-by-email")
+@click.argument("email")
+@click.option("--config", "-c", "config_path", default=None, help="Config file path")
+@click.pass_context
+def accounts_find_by_email(ctx, email, config_path):
+    """Find accounts and breaches linked to an email address."""
+    if "@" not in email:
+        console.print(f"[red]Invalid email address: {email}[/red]")
+        return
+
+    config = ctx.obj["config"]
+    db = ctx.obj["db"]
+    profile_name = ctx.obj["profile_name"] or "cli"
+
+    from src.scanners.holehe_scanner import HoleheScanner
+    from src.scanners.hibp_scanner import HIBPScanner
+
+    all_results = []
+
+    # --- Holehe: find registered accounts ---
+    holehe = HoleheScanner()
+    if holehe.is_available():
+        click.echo("Checking registered accounts...")
+        scan_id = db.create_scan(profile_name, holehe.name, "email", email)
+        try:
+            results = holehe.scan(email)
+            for r in results:
+                db.add_finding(
+                    scan_id, profile_name, r.scanner, r.site_name,
+                    r.site_url, r.data_type, r.details, r.confidence,
+                )
+            db.complete_scan(scan_id, len(results))
+            all_results.extend(results)
+            console.print(f"  [green]Holehe: {len(results)} registered accounts found[/green]")
+        except Exception as e:
+            db.fail_scan(scan_id, str(e))
+            console.print(f"  [red]Holehe failed: {e}[/red]")
+            logger.error("Holehe scan failed for %s: %s", email, e)
+    else:
+        console.print("[yellow]Holehe not available. Skipping account discovery.[/yellow]")
+
+    # --- HIBP: find breaches and pastes ---
+    hibp_key = getattr(config, "hibp_api_key", "")
+    hibp = HIBPScanner(api_key=hibp_key)
+    click.echo("Scanning breaches and paste dumps...")
+    scan_id = db.create_scan(profile_name, hibp.name, "email", email)
+    try:
+        results = hibp.scan(email)
+        for r in results:
+            db.add_finding(
+                scan_id, profile_name, r.scanner, r.site_name,
+                r.site_url, r.data_type, r.details, r.confidence,
+            )
+        db.complete_scan(scan_id, len(results))
+        all_results.extend(results)
+        breaches = [r for r in results if r.data_type == "breach"]
+        pastes = [r for r in results if r.data_type == "paste"]
+        parts = []
+        if breaches:
+            parts.append(f"{len(breaches)} breaches")
+        if pastes:
+            parts.append(f"{len(pastes)} pastes")
+        if parts:
+            console.print(f"  [red]HIBP: {', '.join(parts)} found[/red]")
+        else:
+            console.print("  [green]HIBP: no breaches found[/green]")
+    except Exception as e:
+        db.fail_scan(scan_id, str(e))
+        console.print(f"  [red]HIBP failed: {e}[/red]")
+        logger.error("HIBP scan failed for %s: %s", email, e)
+
+    if not all_results:
+        console.print(f"\n[green]No accounts or breaches found for {email}.[/green]")
+        return
+
+    # --- Build combined results table ---
+    table = Table(title=f"Account & Breach Discovery: {email}")
+    table.add_column("#", style="dim", width=4, justify="right")
+    table.add_column("Service/Breach", style="bold", min_width=20)
+    table.add_column("Type", width=12)
+    table.add_column("Data Exposed", min_width=25)
+    table.add_column("Action", style="cyan", min_width=18)
+
+    for idx, r in enumerate(all_results, 1):
+        # Determine type label
+        if r.data_type == "email_registered":
+            type_label = "account"
+        elif r.data_type == "breach":
+            type_label = "breach"
+        elif r.data_type == "paste":
+            type_label = "paste"
+        else:
+            type_label = r.data_type
+
+        # Determine data exposed
+        if r.data_type == "breach":
+            data_classes = r.details.get("data_classes", [])
+            data_exposed = ", ".join(data_classes[:5])
+            if len(data_classes) > 5:
+                data_exposed += f" (+{len(data_classes) - 5} more)"
+        elif r.data_type == "paste":
+            data_exposed = f"Source: {r.details.get('source', 'Unknown')}"
+            if r.details.get("email_count"):
+                data_exposed += f" ({r.details['email_count']} emails)"
+        elif r.data_type == "email_registered":
+            parts = []
+            if r.details.get("emailrecovery"):
+                parts.append(f"Recovery: {r.details['emailrecovery']}")
+            if r.details.get("phoneNumber"):
+                parts.append(f"Phone: {r.details['phoneNumber']}")
+            data_exposed = ", ".join(parts) if parts else "Email registered"
+        else:
+            data_exposed = str(r.details) if r.details else ""
+
+        # Determine action
+        if r.data_type == "email_registered":
+            action = "Delete account"
+        elif r.data_type == "breach":
+            action = "Change password"
+        elif r.data_type == "paste":
+            action = "Monitor"
+        else:
+            action = "Review"
+
+        # Color the type label
+        if type_label == "account":
+            type_styled = f"[blue]{type_label}[/blue]"
+        elif type_label == "breach":
+            type_styled = f"[red]{type_label}[/red]"
+        elif type_label == "paste":
+            type_styled = f"[yellow]{type_label}[/yellow]"
+        else:
+            type_styled = type_label
+
+        table.add_row(str(idx), r.site_name, type_styled, data_exposed, action)
+
+    console.print()
+    console.print(table)
+    console.print(f"\n[bold]Total: {len(all_results)} result(s) for {email}[/bold]")
+
+    # --- Interactive removal guidance ---
+    account_results = [r for r in all_results if r.data_type == "email_registered"]
+    breach_results = [r for r in all_results if r.data_type == "breach"]
+
+    if account_results or breach_results:
+        if click.confirm("\nWould you like removal guidance for these accounts?"):
+            console.print()
+            if account_results:
+                console.print(Panel("[bold]Account Deletion Guidance[/bold]", border_style="blue"))
+                for r in account_results:
+                    service = r.site_name
+                    domain = r.site_url
+                    if domain and not domain.startswith("http"):
+                        domain = f"https://{domain}"
+                    if domain:
+                        console.print(f"  [bold]{service}[/bold]: Visit {domain}/account/delete or {domain}/settings to delete your account")
+                    else:
+                        console.print(f"  [bold]{service}[/bold]: See guides/{service.lower()}.yaml for step-by-step instructions")
+            if breach_results:
+                console.print()
+                console.print(Panel("[bold]Breach Response Guidance[/bold]", border_style="red"))
+                for r in breach_results:
+                    breach_name = r.site_name
+                    data_classes = r.details.get("data_classes", [])
+                    console.print(f"  [bold]{breach_name}[/bold]: Change your password immediately")
+                    if "Passwords" in data_classes:
+                        console.print(f"    [red]Passwords were exposed[/red] - change on ALL sites where you reused this password")
+                    if data_classes:
+                        console.print(f"    Compromised data: {', '.join(data_classes)}")
+
+
+@accounts.command("find-by-phone")
+@click.argument("phone")
+@click.option("--config", "-c", "config_path", default=None, help="Config file path")
+@click.pass_context
+def accounts_find_by_phone(ctx, phone, config_path):
+    """Find services and information linked to a phone number."""
+    db = ctx.obj["db"]
+    profile_name = ctx.obj["profile_name"] or "cli"
+
+    from src.scanners.phoneinfoga_scanner import PhoneInfogaScanner
+
+    scanner = PhoneInfogaScanner()
+    if not scanner.is_available():
+        console.print("[red]PhoneInfoga not available. Run install.sh first.[/red]")
+        return
+
+    click.echo(f"Scanning phone number: {phone}...")
+    scan_id = db.create_scan(profile_name, "phoneinfoga", "phone", phone)
+
+    all_results = []
+    try:
+        results = scanner.scan(phone)
+        for r in results:
+            db.add_finding(
+                scan_id, profile_name, r.scanner, r.site_name,
+                r.site_url, r.data_type, r.details, r.confidence,
+            )
+        db.complete_scan(scan_id, len(results))
+        all_results.extend(results)
+        if results:
+            console.print(f"  [green]PhoneInfoga: information gathered[/green]")
+        else:
+            console.print("  [yellow]PhoneInfoga: no information found[/yellow]")
+    except Exception as e:
+        db.fail_scan(scan_id, str(e))
+        console.print(f"  [red]PhoneInfoga failed: {e}[/red]")
+        logger.error("PhoneInfoga scan failed for %s: %s", phone, e)
+
+    if not all_results:
+        console.print(f"\n[green]No information found for {phone}.[/green]")
+        return
+
+    # --- Build results table ---
+    table = Table(title=f"Phone Number Discovery: {phone}")
+    table.add_column("#", style="dim", width=4, justify="right")
+    table.add_column("Service/Source", style="bold", min_width=20)
+    table.add_column("Type", width=12)
+    table.add_column("Details", min_width=30)
+    table.add_column("Action", style="cyan", min_width=18)
+
+    for idx, r in enumerate(all_results, 1):
+        type_label = r.data_type if r.data_type else "phone_info"
+
+        # Build details string from the details dict
+        detail_parts = []
+        if r.details:
+            for k, v in r.details.items():
+                if k == "raw" and isinstance(v, dict):
+                    for rk, rv in v.items():
+                        if rv:
+                            detail_parts.append(f"{rk}: {rv}")
+                elif k != "raw" and v:
+                    detail_parts.append(f"{k}: {v}")
+        details_str = ", ".join(detail_parts[:6])
+        if len(detail_parts) > 6:
+            details_str += f" (+{len(detail_parts) - 6} more)"
+
+        action = "Review exposure"
+
+        table.add_row(str(idx), r.site_name, type_label, details_str, action)
+
+    console.print()
+    console.print(table)
+    console.print(f"\n[bold]Total: {len(all_results)} result(s) for {phone}[/bold]")
+
+    # --- Interactive removal guidance ---
+    if all_results:
+        if click.confirm("\nWould you like removal guidance for these findings?"):
+            console.print()
+            console.print(Panel("[bold]Phone Number Removal Guidance[/bold]", border_style="blue"))
+            for r in all_results:
+                service = r.site_name
+                if r.site_url:
+                    console.print(f"  [bold]{service}[/bold]: Visit {r.site_url} to manage your phone number settings")
+                else:
+                    console.print(f"  [bold]{service}[/bold]: See guides/{service.lower()}.yaml for step-by-step instructions")
+            console.print()
+            console.print("  [dim]Tip: Contact your carrier to request unlisted status for your number.[/dim]")
+
+
+@accounts.command("find-by-username")
+@click.argument("username")
+@click.option("--config", "-c", "config_path", default=None, help="Config file path")
+@click.pass_context
+def accounts_find_by_username(ctx, username, config_path):
+    """Find accounts linked to a username across social networks and websites."""
+    db = ctx.obj["db"]
+    profile_name = ctx.obj["profile_name"] or "cli"
+
+    from src.scanners.sherlock_scanner import SherlockScanner
+    from src.scanners.maigret_scanner import MaigretScanner
+
+    scanners_available = []
+    sherlock = SherlockScanner()
+    maigret = MaigretScanner()
+
+    if sherlock.is_available():
+        scanners_available.append(sherlock)
+    else:
+        console.print("[yellow]Sherlock not available. Skipping.[/yellow]")
+
+    if maigret.is_available():
+        scanners_available.append(maigret)
+    else:
+        console.print("[yellow]Maigret not available. Skipping.[/yellow]")
+
+    if not scanners_available:
+        console.print("[red]No username scanners available. Run install.sh first.[/red]")
+        return
+
+    # Collect results from all scanners
+    sherlock_results = []
+    maigret_results = []
+
+    for scanner in scanners_available:
+        click.echo(f"Running {scanner.name} for username: {username}...")
+        scan_id = db.create_scan(profile_name, scanner.name, "username", username)
+        try:
+            results = scanner.scan(username)
+            for r in results:
+                db.add_finding(
+                    scan_id, profile_name, r.scanner, r.site_name,
+                    r.site_url, r.data_type, r.details, r.confidence,
+                )
+            db.complete_scan(scan_id, len(results))
+            if scanner.name == "sherlock":
+                sherlock_results = results
+            elif scanner.name == "maigret":
+                maigret_results = results
+            console.print(f"  [green]{scanner.name}: {len(results)} accounts found[/green]")
+        except Exception as e:
+            db.fail_scan(scan_id, str(e))
+            console.print(f"  [red]{scanner.name} failed: {e}[/red]")
+            logger.error("%s scan failed for %s: %s", scanner.name, username, e)
+
+    # --- Deduplicate: prefer Maigret results when both find the same site ---
+    maigret_sites = {r.site_name.lower(): r for r in maigret_results}
+    deduplicated = list(maigret_results)  # start with all maigret results
+    for r in sherlock_results:
+        if r.site_name.lower() not in maigret_sites:
+            deduplicated.append(r)
+
+    if not deduplicated:
+        console.print(f"\n[green]No accounts found for username: {username}[/green]")
+        return
+
+    # --- Build results table ---
+    table = Table(title=f"Username Discovery: {username}")
+    table.add_column("#", style="dim", width=4, justify="right")
+    table.add_column("Site", style="bold", min_width=20)
+    table.add_column("URL", min_width=35)
+    table.add_column("Confidence", width=12)
+    table.add_column("Action", style="cyan", min_width=15)
+
+    for idx, r in enumerate(deduplicated, 1):
+        confidence = r.confidence or "medium"
+        if confidence == "high":
+            conf_styled = f"[green]{confidence}[/green]"
+        elif confidence == "medium":
+            conf_styled = f"[yellow]{confidence}[/yellow]"
+        else:
+            conf_styled = f"[dim]{confidence}[/dim]"
+
+        url = r.site_url or ""
+        action = "Delete account"
+
+        table.add_row(str(idx), r.site_name, url, conf_styled, action)
+
+    console.print()
+    console.print(table)
+    console.print(f"\n[bold]Total: {len(deduplicated)} unique site(s) for username: {username}[/bold]")
+    if sherlock_results and maigret_results:
+        overlap = len(sherlock_results) + len(maigret_results) - len(deduplicated)
+        if overlap > 0:
+            console.print(f"  [dim]({overlap} duplicate(s) removed across Sherlock and Maigret)[/dim]")
+
+    # --- Interactive removal guidance ---
+    if click.confirm("\nWould you like removal guidance for these accounts?"):
+        console.print()
+        console.print(Panel("[bold]Account Deletion Guidance[/bold]", border_style="blue"))
+        for r in deduplicated:
+            site = r.site_name
+            url = r.site_url or ""
+            if url:
+                # Try to construct a settings/delete URL from the profile URL
+                console.print(f"  [bold]{site}[/bold]: Visit {url} to manage your account")
+            else:
+                console.print(f"  [bold]{site}[/bold]: See guides/{site.lower()}.yaml for step-by-step instructions")
+
+
+@accounts.command("exposure-report")
+@click.option("--profile", "-p", "profile_name", required=True, help="Profile name")
+@click.option("--config", "-c", "config_path", default=None, help="Config file path")
+@click.pass_context
+def accounts_exposure_report(ctx, profile_name, config_path):
+    """Generate a breach exposure summary report for a profile."""
+    config = ctx.obj["config"]
+    db = ctx.obj["db"]
+
+    try:
+        profile = load_profile(profile_name)
+    except FileNotFoundError:
+        console.print(f"[red]Profile '{profile_name}' not found. Create one first.[/red]")
+        return
+
+    if not profile.email_addresses:
+        console.print(f"[red]Profile '{profile_name}' has no email addresses configured.[/red]")
+        return
+
+    from src.scanners.hibp_scanner import HIBPScanner
+
+    hibp_key = getattr(config, "hibp_api_key", "")
+    hibp = HIBPScanner(api_key=hibp_key)
+
+    all_breaches = []  # list of (email, ScanResult)
+    email_count = len(profile.email_addresses)
+
+    console.print(Panel(
+        f"[bold]Breach Exposure Report[/bold]\n"
+        f"Profile: {profile_name}\n"
+        f"Emails: {email_count}",
+        border_style="blue",
+    ))
+
+    for email in profile.email_addresses:
+        click.echo(f"Scanning breaches for {email}...")
+        scan_id = db.create_scan(profile_name, hibp.name, "email", email)
+        try:
+            results = hibp.scan(email)
+            for r in results:
+                db.add_finding(
+                    scan_id, profile_name, r.scanner, r.site_name,
+                    r.site_url, r.data_type, r.details, r.confidence,
+                )
+            db.complete_scan(scan_id, len(results))
+            breaches = [r for r in results if r.data_type == "breach"]
+            pastes = [r for r in results if r.data_type == "paste"]
+            for b in breaches:
+                all_breaches.append((email, b))
+            parts = []
+            if breaches:
+                parts.append(f"{len(breaches)} breaches")
+            if pastes:
+                parts.append(f"{len(pastes)} pastes")
+            if parts:
+                console.print(f"  [red]{email}: {', '.join(parts)}[/red]")
+            else:
+                console.print(f"  [green]{email}: clean[/green]")
+        except Exception as e:
+            db.fail_scan(scan_id, str(e))
+            console.print(f"  [red]{email}: scan failed - {e}[/red]")
+            logger.error("HIBP scan failed for %s: %s", email, e)
+
+    if not all_breaches:
+        console.print()
+        console.print(Panel(
+            "[bold green]No breaches found![/bold green]\n"
+            f"All {email_count} email address(es) are clean.",
+            border_style="green",
+            title="Exposure Summary",
+        ))
+        return
+
+    # --- Aggregate breach data ---
+    # Group by breach name, collect affected emails and data types
+    breach_map = {}  # breach_name -> {date, data_classes, emails}
+    all_data_classes = set()
+
+    for email, b in all_breaches:
+        name = b.site_name
+        if name not in breach_map:
+            breach_map[name] = {
+                "date": b.details.get("breach_date", "Unknown"),
+                "data_classes": b.details.get("data_classes", []),
+                "emails": set(),
+            }
+        breach_map[name]["emails"].add(email)
+        all_data_classes.update(b.details.get("data_classes", []))
+
+    # --- Risk assessment ---
+    high_risk_types = {"Passwords", "Password hints", "Social security numbers", "Credit cards",
+                       "Bank account numbers", "Financial data", "Credit card CVV",
+                       "Partial credit card data", "PINs"}
+    medium_risk_types = {"Email addresses", "Phone numbers", "Physical addresses",
+                         "Dates of birth", "IP addresses", "Genders"}
+
+    exposed_high = all_data_classes & high_risk_types
+    exposed_medium = all_data_classes & medium_risk_types
+
+    if exposed_high:
+        risk_level = "HIGH"
+        risk_color = "red bold"
+        risk_detail = f"Sensitive data exposed: {', '.join(sorted(exposed_high))}"
+    elif exposed_medium:
+        risk_level = "MEDIUM"
+        risk_color = "yellow bold"
+        risk_detail = f"Personal data exposed: {', '.join(sorted(exposed_medium))}"
+    else:
+        risk_level = "LOW"
+        risk_color = "green bold"
+        risk_detail = "Only non-sensitive data types exposed"
+
+    # --- Summary panel ---
+    console.print()
+    console.print(Panel(
+        f"[bold]Total breaches found:[/bold] {len(breach_map)}\n"
+        f"[bold]Emails affected:[/bold] {len(set(e for e, _ in all_breaches))}/{email_count}\n"
+        f"[bold]Risk assessment:[/bold] [{risk_color}]{risk_level}[/{risk_color}]\n"
+        f"  {risk_detail}",
+        title="Exposure Summary",
+        border_style="red" if risk_level == "HIGH" else ("yellow" if risk_level == "MEDIUM" else "green"),
+    ))
+
+    # --- Breach details table ---
+    table = Table(title="Breach Details")
+    table.add_column("Breach Name", style="bold", min_width=22)
+    table.add_column("Date", width=12)
+    table.add_column("Data Types Compromised", min_width=35)
+    table.add_column("Emails Affected", min_width=20)
+
+    for name in sorted(breach_map.keys()):
+        info = breach_map[name]
+        data_types = ", ".join(info["data_classes"][:6])
+        if len(info["data_classes"]) > 6:
+            data_types += f" (+{len(info['data_classes']) - 6} more)"
+        emails = ", ".join(sorted(info["emails"]))
+        table.add_row(name, info["date"], data_types, emails)
+
+    console.print()
+    console.print(table)
+
+    # --- Recommendations ---
+    console.print()
+    recommendations = []
+    if "Passwords" in all_data_classes:
+        recommendations.append("[red]URGENT:[/red] Change passwords on all breached services and any site where you reused them")
+    if "Email addresses" in all_data_classes:
+        recommendations.append("Enable 2FA/MFA on all breached accounts")
+    if "Phone numbers" in all_data_classes:
+        recommendations.append("Watch for SIM-swap attacks; contact your carrier about port-out protection")
+    if "Social security numbers" in all_data_classes:
+        recommendations.append("[red]URGENT:[/red] Place a credit freeze at all three credit bureaus (Equifax, Experian, TransUnion)")
+    if not recommendations:
+        recommendations.append("Continue monitoring for new breaches with periodic scans")
+
+    console.print(Panel(
+        "\n".join(f"  {i+1}. {rec}" for i, rec in enumerate(recommendations)),
+        title="Recommendations",
+        border_style="cyan",
+    ))
 
 
 # ============================================================================

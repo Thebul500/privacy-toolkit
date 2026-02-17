@@ -1,0 +1,19 @@
+service: Cash App
+url: https://cash.app
+category: finance
+deletion_url: https://cash.app/account
+difficulty: medium
+estimated_time: "5 minutes"
+steps:
+  - "Open the Cash App on your phone"
+  - "Transfer your remaining Cash App balance to your linked bank account"
+  - "Tap your profile icon in the top right"
+  - "Scroll down and tap Support"
+  - "Tap Something Else > Account Settings > Close My Cash App Account"
+  - "Follow the prompts to confirm account closure"
+  - "Alternatively, go to the Cash App website and contact support"
+notes: "You must have a $0.00 balance and no pending transactions. If you have Bitcoin in your Cash App, transfer it out first. Cancel any Cash App Card or Boost benefits. Cash App does not have a direct web-based deletion flow — it must be done through the app or support."
+data_retained_after_deletion: "Block (Square) retains financial records as required by law. Transaction records may be kept for several years."
+alternative_actions:
+  - "Remove your linked bank account and debit card before closing"
+  - "Sell any Bitcoin holdings and transfer funds out before closing"

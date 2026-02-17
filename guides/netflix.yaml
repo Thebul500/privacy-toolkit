@@ -1,0 +1,20 @@
+service: Netflix
+url: https://www.netflix.com
+category: streaming
+deletion_url: https://www.netflix.com/cancelplan
+difficulty: medium
+estimated_time: "5 minutes"
+steps:
+  - "Log in to your Netflix account at https://www.netflix.com"
+  - "Go to Account (click your profile icon > Account)"
+  - "Cancel your subscription first by clicking Cancel Membership"
+  - "After cancellation, your account remains accessible until the billing period ends"
+  - "After 10 months of inactivity, Netflix automatically deletes inactive accounts"
+  - "For immediate deletion, contact Netflix support: https://help.netflix.com/contactus"
+  - "Request permanent account and data deletion through the support chat"
+notes: "Netflix does not have a self-service delete button. Cancelling your membership keeps the account dormant for 10 months. For immediate permanent deletion, you must contact support directly."
+data_retained_after_deletion: "Netflix retains certain data for legal obligations and fraud prevention."
+alternative_actions:
+  - "Cancel membership but keep the account for later reactivation"
+  - "Delete individual profiles: Account > Manage Profiles > Delete Profile"
+  - "Remove viewing history: Account > Profile > Viewing Activity > Hide"

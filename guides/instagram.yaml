@@ -1,0 +1,20 @@
+service: Instagram
+url: https://www.instagram.com
+category: social
+deletion_url: https://www.instagram.com/accounts/remove/request/permanent/
+difficulty: medium
+estimated_time: "5 minutes"
+steps:
+  - "Log in to your Instagram account at https://www.instagram.com"
+  - "Go to https://www.instagram.com/accounts/remove/request/permanent/"
+  - "Alternatively, go to Settings > Accounts Center > Personal details > Account ownership and control > Deactivation or deletion"
+  - "Select your Instagram account"
+  - "Choose Delete account and click Continue"
+  - "Select a reason for leaving from the dropdown"
+  - "Re-enter your password and click Delete Account"
+  - "Your account enters a 30-day deletion grace period"
+notes: "Account is recoverable within 30 days by logging back in. After 30 days, deletion is permanent and username cannot be reused."
+data_retained_after_deletion: "Messages sent to others remain in their inboxes. Anonymized usage data may be retained."
+alternative_actions:
+  - "Download your data first: https://www.instagram.com/download/request/"
+  - "Temporarily disable your account instead of deleting it"

@@ -1,0 +1,19 @@
+service: Venmo
+url: https://venmo.com
+category: finance
+deletion_url: https://help.venmo.com/hc/en-us/articles/4407389460499-How-to-Close-My-Venmo-Account
+difficulty: medium
+estimated_time: "5 minutes"
+steps:
+  - "Open the Venmo app or go to https://venmo.com"
+  - "Transfer your remaining Venmo balance to your bank account"
+  - "Ensure there are no pending transactions"
+  - "Go to Settings (gear icon) > Account"
+  - "Tap Close Venmo Account at the bottom"
+  - "Confirm that you want to close your account"
+  - "Your account will be deactivated and then permanently deleted"
+notes: "You must have a $0.00 balance and no pending transactions to close your account. Venmo is owned by PayPal, but closing one does not close the other. Cancel any recurring payments using Venmo first."
+data_retained_after_deletion: "Venmo retains financial records as required by federal and state regulations. Transaction history is kept for regulatory compliance."
+alternative_actions:
+  - "Download your transaction history from the Statements section before closing"
+  - "Remove all linked bank accounts and cards before closing"

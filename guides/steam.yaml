@@ -1,0 +1,21 @@
+service: Steam
+url: https://store.steampowered.com
+category: gaming
+deletion_url: https://help.steampowered.com/en/wizard/HelpDeleteAccount
+difficulty: hard
+estimated_time: "15 minutes"
+steps:
+  - "Log in to your Steam account at https://store.steampowered.com"
+  - "Go to https://help.steampowered.com/en/wizard/HelpDeleteAccount"
+  - "Click Proceed to account deletion"
+  - "Verify your identity through the email verification process"
+  - "Click the confirmation link sent to your email"
+  - "Your account enters a 30-day cooldown period"
+  - "After 30 days, the account and all associated data are permanently deleted"
+  - "Do not log in during the 30-day period or the deletion is cancelled"
+notes: "You permanently lose access to ALL purchased games, items, wallet funds, and community content. This cannot be undone after the 30-day period. Consider the monetary value of your library before proceeding. VAC bans and trade bans do not transfer."
+data_retained_after_deletion: "Valve retains certain data for legal and regulatory compliance. Community posts may remain visible."
+alternative_actions:
+  - "Remove personal info instead: Account Details > edit fields"
+  - "Request your data: https://help.steampowered.com/en/accountdata"
+  - "Consider removing your payment info and games individually instead"
