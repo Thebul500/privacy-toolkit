@@ -1,7 +1,10 @@
 """Playwright-based form automation for data broker opt-outs."""
 
 from __future__ import annotations
+import logging
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 from src.config import BrowserConfig, DATA_DIR
 from src.db import Database
@@ -31,6 +34,7 @@ class FormRemover:
         try:
             from playwright.async_api import async_playwright
         except ImportError:
+            logger.error("Playwright not installed, cannot submit form opt-out for broker=%s", broker.slug)
             return {"success": False, "error": "Playwright not installed. Run: pip install playwright && playwright install chromium"}
 
         result = {
@@ -48,7 +52,8 @@ class FormRemover:
                 page = await context.new_page()
                 page.set_default_timeout(self.config.timeout)
 
-                for step in method.steps:
+                for i, step in enumerate(method.steps):
+                    logger.info("Executing step %d/%d (%s) for broker=%s", i + 1, len(method.steps), step.action, broker.slug)
                     await self._execute_step(page, step, profile, broker)
 
                 # Take final screenshot
@@ -80,6 +85,7 @@ class FormRemover:
             result["removal_id"] = removal_id
 
         except Exception as e:
+            logger.error("Form submission failed for broker=%s url=%s: %s", broker.slug, method.url, e)
             result["success"] = False
             result["error"] = str(e)
             self.db.log("form_failed", profile.name, {

@@ -1,11 +1,14 @@
 """Configuration loading for Privacy Toolkit."""
 
 from __future__ import annotations
+import logging
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 
 import yaml
+
+logger = logging.getLogger(__name__)
 
 from src.models import Broker, Profile
 
@@ -153,6 +156,7 @@ def load_all_brokers() -> list[Broker]:
             continue
         try:
             brokers.append(Broker.from_yaml(path))
-        except Exception:
+        except Exception as e:
+            logger.warning("Failed to load broker YAML %s: %s", path.name, e)
             continue
     return brokers

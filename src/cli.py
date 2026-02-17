@@ -81,6 +81,9 @@ def scan_username(ctx, usernames):
 
     total_results = 0
     for username in usernames:
+        if not username.strip():
+            click.echo("Warning: Skipping empty username.", err=True)
+            continue
         console.print(f"\n[bold]Scanning username: {username}[/bold]")
         for scanner in scanners:
             scan_id = db.create_scan(profile_name, scanner.name, "username", username)
@@ -132,6 +135,9 @@ def scan_email(ctx, emails):
 
     total_results = 0
     for email in emails:
+        if "@" not in email:
+            click.echo(f"Warning: Skipping invalid email (missing @): {email}", err=True)
+            continue
         console.print(f"\n[bold]Scanning email: {email}[/bold]")
         for scanner in scanners:
             scan_id = db.create_scan(profile_name, scanner.name, "email", email)
@@ -182,6 +188,10 @@ def scan_phone(ctx, phones):
         return
 
     for phone in phones:
+        stripped = phone.strip().lstrip("+")
+        if not stripped or not stripped.replace("-", "").replace(" ", "").replace("(", "").replace(")", "").isdigit():
+            click.echo(f"Warning: Skipping invalid phone number: {phone}", err=True)
+            continue
         console.print(f"\n[bold]Scanning phone: {phone}[/bold]")
         scan_id = db.create_scan(profile_name, "phoneinfoga", "phone", phone)
         try:
@@ -222,6 +232,16 @@ def scan_people(ctx, query, query_type):
     if not scanner.is_available():
         console.print("[red]Playwright not available. Run install.sh first.[/red]")
         return
+
+    if query_type == "address":
+        parts = query.split("|")
+        if len(parts) < 4:
+            click.echo(
+                "Error: Address query must be pipe-separated: 'street|city|state|zip' "
+                f"(got {len(parts)} part(s), need 4)",
+                err=True,
+            )
+            return
 
     console.print(f"\n[bold]Searching people-search sites ({query_type}): {query}[/bold]")
     scan_id = db.create_scan(profile_name, "people_search", query_type, query)
@@ -283,9 +303,10 @@ def scan_full(ctx):
     ps = PeopleSearchScanner()
     if ps.is_available():
         if profile.first_name and profile.last_name:
-            state = ""
             if profile.addresses:
                 state = profile.addresses[0].state_abbr or profile.addresses[0].state
+            else:
+                state = None
             name_query = f"{profile.first_name} {profile.last_name}"
             if state:
                 name_query += f" {state}"
@@ -367,6 +388,10 @@ def remove_email(ctx, broker, dry_run):
         profile = load_profile(profile_name)
     except FileNotFoundError:
         console.print(f"[red]Profile '{profile_name}' not found.[/red]")
+        return
+
+    if not profile:
+        click.echo("Error: Failed to load profile. Cannot send removal requests.", err=True)
         return
 
     config = ctx.obj["config"]

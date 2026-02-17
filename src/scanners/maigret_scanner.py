@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 import json
+import logging
 import subprocess
 import sys
 import tempfile
 from datetime import datetime
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 from src.models import ScanResult
 from src.scanners.base import BaseScanner
@@ -22,7 +25,8 @@ class MaigretScanner(BaseScanner):
                 capture_output=True, text=True, timeout=10,
             )
             return result.returncode == 0
-        except (FileNotFoundError, subprocess.TimeoutExpired):
+        except (FileNotFoundError, subprocess.TimeoutExpired) as e:
+            logger.debug("Maigret not available: %s", e)
             return False
 
     def scan(self, query: str, query_type: str = "username") -> list[ScanResult]:
@@ -41,14 +45,15 @@ class MaigretScanner(BaseScanner):
                     cmd, capture_output=True, text=True, timeout=600,
                 )
             except subprocess.TimeoutExpired:
-                pass
+                logger.warning("Maigret scan timed out after 600s for query=%r", query)
 
             results = []
             if output_file.exists():
                 try:
                     with open(output_file) as f:
                         data = json.load(f)
-                except (json.JSONDecodeError, OSError):
+                except (json.JSONDecodeError, OSError) as e:
+                    logger.error("Failed to read Maigret output file %s: %s", output_file, e)
                     return results
 
                 # Maigret JSON format varies, handle common structures

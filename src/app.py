@@ -109,7 +109,8 @@ async def profiles_page(request: Request, message: Optional[str] = None,
     for name in names:
         try:
             loaded.append(load_profile(name))
-        except Exception:
+        except Exception as e:
+            logger.warning("Failed to load profile %s: %s", name, e)
             loaded.append(Profile(name=name))
 
     return templates.TemplateResponse("profiles.html", {
@@ -195,9 +196,16 @@ async def scans_page(request: Request, message: Optional[str] = None):
 async def trigger_scan(profile: str = Form(...)):
     # Verify profile exists
     try:
-        load_profile(profile)
+        loaded = load_profile(profile)
     except FileNotFoundError:
-        return RedirectResponse("/scans", status_code=303)
+        return RedirectResponse(
+            "/scans?message=Profile+not+found&message_type=error", status_code=303
+        )
+
+    if not loaded:
+        return RedirectResponse(
+            "/scans?message=Failed+to+load+profile&message_type=error", status_code=303
+        )
 
     task_id = task_manager.submit(
         f"Full scan: {profile}",

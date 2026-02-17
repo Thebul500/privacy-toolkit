@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 import html
+import logging
 import re
 import smtplib
 import time
@@ -9,6 +10,8 @@ import uuid
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 from jinja2 import Environment, FileSystemLoader
 
@@ -78,7 +81,8 @@ class EmailRemover:
 
         try:
             template = self.env.get_template(template_name)
-        except Exception:
+        except Exception as e:
+            logger.warning("Template %s not found for broker=%s, falling back to ccpa_deletion_request.j2: %s", template_name, broker.slug, e)
             template = self.env.get_template("ccpa_deletion_request.j2")
 
         evidence = self._gather_evidence(broker, profile)
@@ -165,6 +169,7 @@ class EmailRemover:
             time.sleep(self.smtp.delay_seconds)
 
         except Exception as e:
+            logger.error("SMTP send failed for broker=%s to=%s: %s", broker.slug, method.address, e)
             result["success"] = False
             result["error"] = str(e)
             self.db.log("email_failed", profile.name, {
@@ -189,7 +194,8 @@ class EmailRemover:
 
         try:
             template = self.env.get_template("follow_up_request.j2")
-        except Exception:
+        except Exception as e:
+            logger.error("Follow-up template not found for broker=%s: %s", broker.slug, e)
             return {"success": False, "error": "Follow-up template not found"}
 
         evidence = self._gather_evidence(broker, profile)
@@ -259,6 +265,7 @@ class EmailRemover:
             return {"success": True, "follow_up_id": follow_up_id}
 
         except Exception as e:
+            logger.error("Follow-up SMTP send failed for broker=%s: %s", broker.slug, e)
             self.db.log("follow_up_failed", removal.get("profile"), {
                 "broker": broker.slug, "error": str(e),
             }, success=False)

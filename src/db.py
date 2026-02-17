@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 import json
+import logging
 import sqlite3
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Optional
+
+logger = logging.getLogger(__name__)
 
 from src.config import TOOLKIT_DIR
 
@@ -90,10 +93,14 @@ class Database:
         return conn
 
     def _init_schema(self) -> None:
-        conn = self._connect()
-        conn.executescript(SCHEMA)
-        conn.commit()
-        conn.close()
+        try:
+            conn = self._connect()
+            conn.executescript(SCHEMA)
+            conn.commit()
+            conn.close()
+        except sqlite3.Error as e:
+            logger.error("Failed to initialize database schema at %s: %s", self.path, e)
+            raise
 
     # --- Scans ---
 
@@ -186,8 +193,8 @@ class Database:
             if d.get("details"):
                 try:
                     d["details"] = json.loads(d["details"])
-                except (json.JSONDecodeError, TypeError):
-                    pass
+                except (json.JSONDecodeError, TypeError) as e:
+                    logger.warning("Failed to parse finding details JSON for finding_id=%s: %s", d.get("id"), e)
             results.append(d)
         return results
 
@@ -210,8 +217,8 @@ class Database:
             if d.get("details"):
                 try:
                     d["details"] = json.loads(d["details"])
-                except (json.JSONDecodeError, TypeError):
-                    pass
+                except (json.JSONDecodeError, TypeError) as e:
+                    logger.warning("Failed to parse finding details JSON for finding_id=%s broker=%s: %s", d.get("id"), broker_slug, e)
             results.append(d)
         return results
 

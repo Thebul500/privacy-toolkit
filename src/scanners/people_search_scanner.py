@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 import asyncio
+import logging
 import re
 from datetime import datetime
 from typing import Optional
 
 from src.models import ScanResult
 from src.scanners.base import BaseScanner
+
+logger = logging.getLogger(__name__)
 
 # Each broker entry: (name, search_url_template, result_indicator_selector, listing_url_pattern)
 PEOPLE_SEARCH_SITES = [
@@ -359,7 +362,8 @@ class PeopleSearchScanner(BaseScanner):
                     result = await self._check_site(context, site, query, query_type)
                     if result:
                         results.append(result)
-                except Exception:
+                except Exception as e:
+                    logger.warning("People search failed for site=%s query=%r: %s", site.get("name", "unknown"), query, e)
                     continue
 
             await browser.close()
@@ -409,8 +413,8 @@ class PeopleSearchScanner(BaseScanner):
                             listing_url = site["base_url"] + href
                         elif href.startswith("http"):
                             listing_url = href
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("Selector query failed for site=%s: %s", site.get("name", "unknown"), e)
 
             if not found:
                 return None
@@ -441,10 +445,10 @@ class PeopleSearchScanner(BaseScanner):
             if not template:
                 return None
             parts = query.strip().split()
-            if len(parts) < 2:
+            if not parts:
                 return None
             first = parts[0].lower()
-            last = parts[1].lower()
+            last = parts[1].lower() if len(parts) > 1 else ""
             state = _normalize_state(parts[2]) if len(parts) > 2 else ""
             path = template.format(first=first, last=last, state=state)
             return base + path

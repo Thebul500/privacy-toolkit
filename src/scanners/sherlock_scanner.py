@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 import json
+import logging
 import subprocess
 import sys
 import tempfile
 from datetime import datetime
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 from src.models import ScanResult
 from src.scanners.base import BaseScanner
@@ -22,7 +25,8 @@ class SherlockScanner(BaseScanner):
                 capture_output=True, text=True, timeout=10,
             )
             return result.returncode == 0
-        except (FileNotFoundError, subprocess.TimeoutExpired):
+        except (FileNotFoundError, subprocess.TimeoutExpired) as e:
+            logger.debug("Sherlock not available: %s", e)
             return False
 
     def scan(self, query: str, query_type: str = "username") -> list[ScanResult]:
@@ -40,14 +44,15 @@ class SherlockScanner(BaseScanner):
                     cmd, capture_output=True, text=True, timeout=300,
                 )
             except subprocess.TimeoutExpired:
-                pass
+                logger.warning("Sherlock scan timed out after 300s for query=%r", query)
 
             results = []
             if output_file.exists():
                 try:
                     with open(output_file) as f:
                         data = json.load(f)
-                except (json.JSONDecodeError, OSError):
+                except (json.JSONDecodeError, OSError) as e:
+                    logger.error("Failed to read Sherlock output file %s: %s", output_file, e)
                     return results
 
                 # Sherlock JSON: {username: {site_name: {url_user: ..., status: ...}}}
