@@ -1,6 +1,7 @@
 """Email-based CCPA/GDPR removal request sender."""
 
 from __future__ import annotations
+import datetime as dt
 import html
 import logging
 import re
@@ -66,6 +67,66 @@ class EmailRemover:
             "privacy_policy_url": broker.privacy_policy_url,
         }
 
+    def _render_template(self, broker: Broker, profile: Profile, evidence: dict,
+                         template_name: str = "", **extra_vars: str) -> str:
+        """Render an email template and return the HTML body."""
+        if not template_name:
+            method = broker.email_method
+            template_name = f"{method.template}.j2" if method else "ccpa_deletion_request.j2"
+
+        try:
+            template = self.env.get_template(template_name)
+        except Exception as e:
+            logger.warning("Template %s not found for broker=%s, falling back to ccpa_deletion_request.j2: %s", template_name, broker.slug, e)
+            template = self.env.get_template("ccpa_deletion_request.j2")
+
+        context = {
+            "full_name": profile.full_name or f"{profile.first_name} {profile.last_name}".strip(),
+            "first_name": profile.first_name,
+            "last_name": profile.last_name,
+            "email": profile.primary_email,
+            "phone": profile.primary_phone,
+            "address": profile.primary_address,
+            "broker_name": broker.name,
+            "broker_url": broker.url,
+            "date": time.strftime("%B %d, %Y"),
+            "listing_urls": evidence["listing_urls"],
+            "data_types_found": evidence["data_types_found"],
+            "privacy_policy_url": evidence["privacy_policy_url"],
+        }
+        context.update(extra_vars)
+        return template.render(**context)
+
+    def _send_email(self, to_addr: str, subject: str, html_body: str,
+                    from_addr: str = "", from_name: str = "",
+                    reply_to: str = "", message_id: str = "",
+                    extra_headers: dict[str, str] | None = None) -> str:
+        """Open an SMTP connection, send the message, and return the message_id."""
+        from_addr = from_addr or self.smtp.from_email or self.smtp.username
+        reply_to = reply_to or from_addr
+        plain_body = _html_to_plain(html_body)
+
+        msg = MIMEMultipart("alternative")
+        msg["From"] = f"{from_name} <{from_addr}>" if from_name else from_addr
+        msg["To"] = to_addr
+        msg["Subject"] = subject
+        msg["Reply-To"] = reply_to
+        msg["Message-ID"] = message_id
+        msg["Disposition-Notification-To"] = reply_to
+        if extra_headers:
+            for key, value in extra_headers.items():
+                msg[key] = value
+        msg.attach(MIMEText(plain_body, "plain"))
+        msg.attach(MIMEText(html_body, "html"))
+
+        with smtplib.SMTP(self.smtp.host, self.smtp.port, timeout=30) as server:
+            if self.smtp.use_tls:
+                server.starttls()
+            server.login(self.smtp.username, self.smtp.password)
+            server.send_message(msg)
+
+        return message_id
+
     def send_removal_request(
         self,
         broker: Broker,
@@ -77,30 +138,11 @@ class EmailRemover:
             return {"success": False, "error": "No email opt-out method for this broker"}
 
         request_id = str(uuid.uuid4())[:8]
-        template_name = f"{method.template}.j2"
-
-        try:
-            template = self.env.get_template(template_name)
-        except Exception as e:
-            logger.warning("Template %s not found for broker=%s, falling back to ccpa_deletion_request.j2: %s", template_name, broker.slug, e)
-            template = self.env.get_template("ccpa_deletion_request.j2")
-
         evidence = self._gather_evidence(broker, profile)
-
-        html_body = template.render(
-            full_name=profile.full_name or f"{profile.first_name} {profile.last_name}".strip(),
-            first_name=profile.first_name,
-            last_name=profile.last_name,
-            email=profile.primary_email,
-            phone=profile.primary_phone,
-            address=profile.primary_address,
+        html_body = self._render_template(
+            broker, profile, evidence,
+            template_name=f"{method.template}.j2",
             request_id=request_id,
-            broker_name=broker.name,
-            broker_url=broker.url,
-            date=time.strftime("%B %d, %Y"),
-            listing_urls=evidence["listing_urls"],
-            data_types_found=evidence["data_types_found"],
-            privacy_policy_url=evidence["privacy_policy_url"],
         )
         plain_body = _html_to_plain(html_body)
 
@@ -109,16 +151,6 @@ class EmailRemover:
         from_name = profile.full_name or f"{profile.first_name} {profile.last_name}".strip()
         reply_to = profile.primary_email or from_addr
         message_id = f"<{request_id}@privacy-toolkit>"
-
-        msg = MIMEMultipart("alternative")
-        msg["From"] = f"{from_name} <{from_addr}>"
-        msg["To"] = method.address
-        msg["Subject"] = subject
-        msg["Reply-To"] = reply_to
-        msg["Message-ID"] = message_id
-        msg["Disposition-Notification-To"] = reply_to
-        msg.attach(MIMEText(plain_body, "plain"))
-        msg.attach(MIMEText(html_body, "html"))
 
         result = {
             "broker": broker.slug,
@@ -139,11 +171,15 @@ class EmailRemover:
             return {"success": False, "error": "SMTP not configured. Edit config/config.yaml"}
 
         try:
-            with smtplib.SMTP(self.smtp.host, self.smtp.port, timeout=30) as server:
-                if self.smtp.use_tls:
-                    server.starttls()
-                server.login(self.smtp.username, self.smtp.password)
-                server.send_message(msg)
+            self._send_email(
+                to_addr=method.address,
+                subject=subject,
+                html_body=html_body,
+                from_addr=from_addr,
+                from_name=from_name,
+                reply_to=reply_to,
+                message_id=message_id,
+            )
 
             # Track in database
             removal_id = self.db.create_removal(
@@ -192,35 +228,22 @@ class EmailRemover:
         original_ref = (removal.get("email_message_id") or "").strip("<>").split("@")[0]
         follow_up_id = str(uuid.uuid4())[:8]
 
-        try:
-            template = self.env.get_template("follow_up_request.j2")
-        except Exception as e:
-            logger.error("Follow-up template not found for broker=%s: %s", broker.slug, e)
-            return {"success": False, "error": "Follow-up template not found"}
-
         evidence = self._gather_evidence(broker, profile)
 
-        html_body = template.render(
-            full_name=profile.full_name or f"{profile.first_name} {profile.last_name}".strip(),
-            email=profile.primary_email,
-            phone=profile.primary_phone,
-            address=profile.primary_address,
-            broker_name=broker.name,
-            broker_url=broker.url,
+        days_elapsed = 45
+        if removal.get("submitted_at"):
+            days_elapsed = (
+                dt.datetime.now() - dt.datetime.fromisoformat(removal["submitted_at"])
+            ).days
+
+        html_body = self._render_template(
+            broker, profile, evidence,
+            template_name="follow_up_request.j2",
             original_ref=original_ref,
             follow_up_id=follow_up_id,
             original_date=removal.get("submitted_at", "")[:10],
-            date=time.strftime("%B %d, %Y"),
-            days_elapsed=(
-                (__import__("datetime").datetime.now() -
-                 __import__("datetime").datetime.fromisoformat(removal["submitted_at"]))
-                .days if removal.get("submitted_at") else 45
-            ),
-            listing_urls=evidence["listing_urls"],
-            data_types_found=evidence["data_types_found"],
-            privacy_policy_url=evidence["privacy_policy_url"],
+            days_elapsed=str(days_elapsed),
         )
-        plain_body = _html_to_plain(html_body)
 
         subject = f"Second Request \u2014 Data Deletion Follow-Up \u2014 Original Ref: {original_ref}"
         from_addr = self.smtp.from_email or self.smtp.username
@@ -228,27 +251,23 @@ class EmailRemover:
         reply_to = profile.primary_email or from_addr
         message_id = f"<{follow_up_id}@privacy-toolkit>"
 
-        msg = MIMEMultipart("alternative")
-        msg["From"] = f"{from_name} <{from_addr}>"
-        msg["To"] = method.address
-        msg["Subject"] = subject
-        msg["Reply-To"] = reply_to
-        msg["Message-ID"] = message_id
-        msg["In-Reply-To"] = removal.get("email_message_id", "")
-        msg["References"] = removal.get("email_message_id", "")
-        msg["Disposition-Notification-To"] = reply_to
-        msg.attach(MIMEText(plain_body, "plain"))
-        msg.attach(MIMEText(html_body, "html"))
-
         if not self.smtp.username or not self.smtp.password:
             return {"success": False, "error": "SMTP not configured"}
 
         try:
-            with smtplib.SMTP(self.smtp.host, self.smtp.port, timeout=30) as server:
-                if self.smtp.use_tls:
-                    server.starttls()
-                server.login(self.smtp.username, self.smtp.password)
-                server.send_message(msg)
+            self._send_email(
+                to_addr=method.address,
+                subject=subject,
+                html_body=html_body,
+                from_addr=from_addr,
+                from_name=from_name,
+                reply_to=reply_to,
+                message_id=message_id,
+                extra_headers={
+                    "In-Reply-To": removal.get("email_message_id", ""),
+                    "References": removal.get("email_message_id", ""),
+                },
+            )
 
             # Mark follow-up sent in notes
             existing_notes = removal.get("notes") or ""

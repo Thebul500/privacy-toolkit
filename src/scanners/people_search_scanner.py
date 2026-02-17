@@ -317,6 +317,9 @@ def _normalize_state(state: str) -> str:
 class PeopleSearchScanner(BaseScanner):
     name = "people_search"
 
+    def __init__(self, rate_limit_delay: float = 2.0):
+        self.rate_limit_delay = rate_limit_delay
+
     def is_available(self) -> bool:
         try:
             from playwright.async_api import async_playwright  # noqa: F401
@@ -358,7 +361,11 @@ class PeopleSearchScanner(BaseScanner):
             )
             context.set_default_timeout(30000)
 
-            for site in PEOPLE_SEARCH_SITES:
+            for i, site in enumerate(PEOPLE_SEARCH_SITES):
+                # Rate limit: delay between site checks to avoid IP blocking
+                if i > 0 and self.rate_limit_delay > 0:
+                    logger.debug("Rate limiting: sleeping %.1fs before checking %s", self.rate_limit_delay, site.get("name", "unknown"))
+                    await asyncio.sleep(self.rate_limit_delay)
                 try:
                     result = await self._check_site(context, site, query, query_type)
                     if result:
@@ -437,61 +444,65 @@ class PeopleSearchScanner(BaseScanner):
         finally:
             await page.close()
 
+    def _build_name_url(self, site: dict, query: str) -> Optional[str]:
+        """Build a name-based search URL."""
+        template = site.get("search_by_name")
+        if not template:
+            return None
+        parts = query.strip().split()
+        if not parts:
+            return None
+        first = parts[0].lower()
+        last = parts[1].lower() if len(parts) > 1 else ""
+        state = _normalize_state(parts[2]) if len(parts) > 2 else ""
+        return site["base_url"] + template.format(first=first, last=last, state=state)
+
+    def _build_phone_url(self, site: dict, phone: str) -> Optional[str]:
+        """Build a phone-based search URL."""
+        template = site.get("search_by_phone")
+        if not template:
+            return None
+        return site["base_url"] + template.format(phone=_normalize_phone(phone))
+
+    def _build_email_url(self, site: dict, email: str) -> Optional[str]:
+        """Build an email-based search URL."""
+        template = site.get("search_by_email")
+        if not template:
+            return None
+        return site["base_url"] + template.format(email=email)
+
+    def _build_address_url(self, site: dict, query: str) -> Optional[str]:
+        """Build an address-based search URL."""
+        template = site.get("search_by_address")
+        if not template:
+            return None
+        parts = query.split("|")
+        if len(parts) < 4:
+            return None
+        city = parts[1].strip()
+        state = _normalize_state(parts[2].strip())
+        zip_code = parts[3].strip()
+        # Some templates use URL-encoded spaces (+), others use dashes
+        street_slash = parts[0].strip().replace(" ", "-")
+        path = template.format(
+            street=street_slash, city=city, state=state, zip=zip_code,
+        )
+        # Re-format with + for query-string style URLs
+        if "?" in template:
+            street_encoded = parts[0].strip().replace(" ", "+")
+            path = template.format(
+                street=street_encoded, city=city, state=state, zip=zip_code,
+            )
+        return site["base_url"] + path
+
     def _build_url(self, site: dict, query: str, query_type: str) -> Optional[str]:
         """Build the search URL for a given site and query type."""
-        base = site["base_url"]
-
         if query_type == "name":
-            template = site.get("search_by_name")
-            if not template:
-                return None
-            parts = query.strip().split()
-            if not parts:
-                return None
-            first = parts[0].lower()
-            last = parts[1].lower() if len(parts) > 1 else ""
-            state = _normalize_state(parts[2]) if len(parts) > 2 else ""
-            path = template.format(first=first, last=last, state=state)
-            return base + path
-
+            return self._build_name_url(site, query)
         elif query_type == "phone":
-            template = site.get("search_by_phone")
-            if not template:
-                return None
-            phone = _normalize_phone(query)
-            path = template.format(phone=phone)
-            return base + path
-
+            return self._build_phone_url(site, query)
         elif query_type == "email":
-            template = site.get("search_by_email")
-            if not template:
-                return None
-            path = template.format(email=query)
-            return base + path
-
+            return self._build_email_url(site, query)
         elif query_type == "address":
-            template = site.get("search_by_address")
-            if not template:
-                return None
-            parts = query.split("|")
-            if len(parts) < 4:
-                return None
-            street = parts[0].strip().replace(" ", "-")
-            city = parts[1].strip()
-            state = _normalize_state(parts[2].strip())
-            zip_code = parts[3].strip()
-            # Some templates use URL-encoded spaces (+), others use dashes
-            street_plus = parts[0].strip().replace(" ", "+")
-            street_slash = parts[0].strip().replace(" ", "-")
-            path = template.format(
-                street=street_slash, city=city, state=state, zip=zip_code,
-            )
-            # Re-format with + for query-string style URLs
-            if "?" in template:
-                street_encoded = parts[0].strip().replace(" ", "+")
-                path = template.format(
-                    street=street_encoded, city=city, state=state, zip=zip_code,
-                )
-            return base + path
-
+            return self._build_address_url(site, query)
         return None

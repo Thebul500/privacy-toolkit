@@ -1,0 +1,137 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Cache pip packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install ruff  # linter
+
+      - name: Lint with ruff
+        run: |
+          ruff check src/ tests/ --select E,F,W --ignore E501,E402
+
+      - name: Run tests
+        run: |
+          pytest tests/ -v --tb=short
+
+      - name: Check syntax of all source files
+        run: |
+          python -c "
+          import py_compile, pathlib, sys
+          errors = []
+          for f in pathlib.Path('src').rglob('*.py'):
+              try:
+                  py_compile.compile(str(f), doraise=True)
+              except py_compile.PyCompileError as e:
+                  errors.append(str(e))
+          if errors:
+              print('\n'.join(errors), file=sys.stderr)
+              sys.exit(1)
+          print(f'All source files compile OK')
+          "
+
+  validate-brokers:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          pip install pyyaml
+
+      - name: Validate broker YAML files
+        run: |
+          python -c "
+          import yaml, pathlib, sys
+          errors = []
+          broker_dir = pathlib.Path('brokers')
+          required = ['slug', 'name', 'url', 'category', 'priority']
+          valid_priorities = ['critical', 'high', 'medium', 'low']
+          for f in sorted(broker_dir.glob('*.yaml')):
+              try:
+                  data = yaml.safe_load(f.read_text())
+                  for field in required:
+                      if field not in data:
+                          errors.append(f'{f.name}: missing {field}')
+                  if data.get('priority') not in valid_priorities:
+                      errors.append(f'{f.name}: invalid priority {data.get(\"priority\")}')
+              except Exception as e:
+                  errors.append(f'{f.name}: {e}')
+          if errors:
+              print('\n'.join(errors), file=sys.stderr)
+              sys.exit(1)
+          count = len(list(broker_dir.glob('*.yaml')))
+          print(f'All {count} broker files valid')
+          "
+
+  validate-guides:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install pyyaml
+
+      - name: Validate guide YAML files
+        run: |
+          python -c "
+          import yaml, pathlib, sys
+          errors = []
+          guide_dir = pathlib.Path('guides')
+          required = ['service', 'url', 'category', 'deletion_url', 'difficulty', 'steps']
+          valid_difficulties = ['easy', 'medium', 'hard']
+          for f in sorted(guide_dir.glob('*.yaml')):
+              try:
+                  data = yaml.safe_load(f.read_text())
+                  for field in required:
+                      if field not in data:
+                          errors.append(f'{f.name}: missing {field}')
+                  if data.get('difficulty') not in valid_difficulties:
+                      errors.append(f'{f.name}: invalid difficulty')
+              except Exception as e:
+                  errors.append(f'{f.name}: {e}')
+          if errors:
+              print('\n'.join(errors), file=sys.stderr)
+              sys.exit(1)
+          count = len(list(guide_dir.glob('*.yaml')))
+          print(f'All {count} guide files valid')
+          "

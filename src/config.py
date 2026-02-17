@@ -71,6 +71,7 @@ class BrowserConfig:
     headless: bool = True
     timeout: int = 30000
     screenshot_on_submit: bool = True
+    rate_limit_delay: float = 2.0
 
 
 @dataclass
@@ -132,6 +133,7 @@ class Config:
                 headless=browser_data.get("headless", True),
                 timeout=browser_data.get("timeout", 30000),
                 screenshot_on_submit=browser_data.get("screenshot_on_submit", True),
+                rate_limit_delay=float(browser_data.get("rate_limit_delay", 2.0)),
             ),
             web=WebConfig(
                 host=web_data.get("host", "0.0.0.0"),

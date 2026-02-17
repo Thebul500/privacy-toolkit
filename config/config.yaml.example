@@ -20,6 +20,7 @@ browser:
   headless: true
   timeout: 30000
   screenshot_on_submit: true
+  rate_limit_delay: 2.0  # Seconds between people-search site checks
 
 scheduling:
   rescan_interval_days: 90

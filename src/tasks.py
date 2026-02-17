@@ -37,7 +37,7 @@ class TaskInfo:
 class TaskManager:
     """Manages background tasks using a thread pool."""
 
-    def __init__(self, max_workers: int = 2):
+    def __init__(self, max_workers: int = 2) -> None:
         self._executor = ThreadPoolExecutor(max_workers=max_workers)
         self._tasks: dict[str, TaskInfo] = {}
         self._lock = threading.Lock()

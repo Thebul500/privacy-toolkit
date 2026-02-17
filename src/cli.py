@@ -235,7 +235,8 @@ def scan_people(ctx, query, query_type):
 
     from src.scanners.people_search_scanner import PeopleSearchScanner
 
-    scanner = PeopleSearchScanner()
+    config = ctx.obj["config"]
+    scanner = PeopleSearchScanner(rate_limit_delay=config.browser.rate_limit_delay)
     if not scanner.is_available():
         console.print("[red]Playwright not available. Run install.sh first.[/red]")
         return
@@ -307,7 +308,8 @@ def scan_full(ctx):
     # People-search scans (name + phone + email across data broker sites)
     console.print("\n[bold cyan]--- People Search Scans ---[/bold cyan]")
     from src.scanners.people_search_scanner import PeopleSearchScanner
-    ps = PeopleSearchScanner()
+    config = ctx.obj["config"]
+    ps = PeopleSearchScanner(rate_limit_delay=config.browser.rate_limit_delay)
     if ps.is_available():
         if profile.first_name and profile.last_name:
             if profile.addresses:
@@ -991,8 +993,9 @@ def remove_email(ctx, broker, dry_run):
 @remove.command("form-request")
 @click.option("--broker", "-b", required=True, help="Broker slug")
 @click.option("--headed", is_flag=True, help="Show browser window")
+@click.option("--dry-run", is_flag=True, help="Preview form steps without submitting")
 @click.pass_context
-def remove_form(ctx, broker, headed):
+def remove_form(ctx, broker, headed, dry_run):
     """Automate opt-out web forms via browser (Playwright)."""
     profile_name = ctx.obj["profile_name"]
     if not profile_name:
@@ -1017,21 +1020,31 @@ def remove_form(ctx, broker, headed):
     from src.removers.form_remover import FormRemover
     remover = FormRemover(config.browser, db)
 
-    console.print(f"[bold]Submitting form opt-out for {broker_obj.name}...[/bold]")
+    if dry_run:
+        console.print(f"[bold]DRY RUN - Previewing form opt-out for {broker_obj.name}...[/bold]")
+    else:
+        console.print(f"[bold]Submitting form opt-out for {broker_obj.name}...[/bold]")
 
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     try:
         result = loop.run_until_complete(
-            remover.submit_opt_out(broker_obj, profile, headless=not headed)
+            remover.submit_opt_out(broker_obj, profile, headless=not headed, dry_run=dry_run)
         )
     finally:
         loop.close()
 
     if result.get("success"):
-        console.print(f"[green]Form submitted for {broker_obj.name}[/green]")
-        if result.get("screenshot"):
-            console.print(f"  Screenshot: {result['screenshot']}")
+        if dry_run:
+            console.print(f"\n[bold]Steps that would be executed for {broker_obj.name}:[/bold]")
+            for step_desc in result.get("steps", []):
+                console.print(f"  {step_desc}")
+            if result.get("screenshot"):
+                console.print(f"\n  Screenshot: {result['screenshot']}")
+        else:
+            console.print(f"[green]Form submitted for {broker_obj.name}[/green]")
+            if result.get("screenshot"):
+                console.print(f"  Screenshot: {result['screenshot']}")
     else:
         console.print(f"[red]Failed: {result.get('error', 'unknown')}[/red]")
 
@@ -1104,20 +1117,42 @@ def track_reappeared(ctx, removal_id):
 # ============================================================================
 
 @cli.command("report")
-@click.option("--format", "-f", "fmt", type=click.Choice(["table", "json"]), default="table")
-@click.option("--output", "-o", default=None, help="Output file path (for json)")
+@click.option("--format", "-f", "fmt", type=click.Choice(["table", "json", "csv", "html"]), default="table")
+@click.option("--output", "-o", default=None, help="Output file path")
+@click.option("--type", "-t", "report_type", type=click.Choice(["findings", "removals"]), default="findings",
+              help="Report type: findings or removals")
 @click.pass_context
-def report(ctx, fmt, output):
+def report(ctx, fmt, output, report_type):
     """Generate exposure report from scan results."""
     db = ctx.obj["db"]
     profile_name = ctx.obj["profile_name"]
 
     if fmt == "table":
-        from src.reporting.terminal import show_scan_results
-        show_scan_results(db, profile_name, console)
+        from src.reporting.terminal import show_scan_results, show_removal_status
+        if report_type == "findings":
+            show_scan_results(db, profile_name, console)
+        else:
+            show_removal_status(db, profile_name, console)
     elif fmt == "json":
-        from src.reporting.json_export import export_findings
-        path = export_findings(db, profile_name, output)
+        from src.reporting.json_export import export_findings, export_removals
+        if report_type == "findings":
+            path = export_findings(db, profile_name, output)
+        else:
+            path = export_removals(db, profile_name, output)
+        console.print(f"[green]Exported to: {path}[/green]")
+    elif fmt == "csv":
+        from src.reporting.csv_export import export_findings, export_removals
+        if report_type == "findings":
+            path = export_findings(db, profile_name, output)
+        else:
+            path = export_removals(db, profile_name, output)
+        console.print(f"[green]Exported to: {path}[/green]")
+    elif fmt == "html":
+        from src.reporting.html_export import export_findings, export_removals
+        if report_type == "findings":
+            path = export_findings(db, profile_name, output)
+        else:
+            path = export_removals(db, profile_name, output)
         console.print(f"[green]Exported to: {path}[/green]")
 
 

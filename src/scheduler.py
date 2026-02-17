@@ -9,6 +9,8 @@ from typing import TYPE_CHECKING
 from src.config import TOOLKIT_DIR, ScheduleConfig
 
 if TYPE_CHECKING:
+    from apscheduler.schedulers.background import BackgroundScheduler
+
     from src.config import Config
     from src.db import Database
     from src.tasks import TaskManager
@@ -140,7 +142,7 @@ def _scheduled_follow_ups(config: "Config", db: "Database",
 
 
 def setup_apscheduler(config: "Config", db: "Database",
-                      task_manager: "TaskManager"):
+                      task_manager: "TaskManager") -> "BackgroundScheduler":
     """Create and start an APScheduler BackgroundScheduler from config.
 
     Returns the scheduler instance (caller should keep a reference).
