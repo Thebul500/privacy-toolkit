@@ -4,20 +4,16 @@ from __future__ import annotations
 
 from datetime import datetime
 
-import yaml
 
 from src.models import (
     Address,
     Broker,
-    FormStep,
-    OptOutMethod,
     OptOutMethodType,
     Priority,
     Profile,
     RemovalStatus,
     ScanResult,
     ScanStatus,
-    Verification,
 )
 
 

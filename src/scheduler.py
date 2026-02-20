@@ -3,7 +3,6 @@
 from __future__ import annotations
 import logging
 import subprocess
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 from src.config import TOOLKIT_DIR, ScheduleConfig
@@ -35,11 +34,11 @@ def generate_cron_lines(profile: str, config: ScheduleConfig) -> list[str]:
 
     lines = [
         MARKER_START,
-        f"# Weekly exposure re-scan",
+        "# Weekly exposure re-scan",
         f"{config.cron_time} cd {TOOLKIT_DIR} && {cli} scan full -p {profile} >> {log_dir}/cron-scan.log 2>&1",
-        f"# Daily pending follow-up check",
+        "# Daily pending follow-up check",
         f"0 9 * * * cd {TOOLKIT_DIR} && {cli} track pending -p {profile} >> {log_dir}/cron-pending.log 2>&1",
-        f"# Weekly follow-up emails for overdue removals (Monday 10 AM)",
+        "# Weekly follow-up emails for overdue removals (Monday 10 AM)",
         f"0 10 * * 1 cd {TOOLKIT_DIR} && {cli} -p {profile} remove follow-up >> {log_dir}/cron-followup.log 2>&1",
         MARKER_END,
     ]

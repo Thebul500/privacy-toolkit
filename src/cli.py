@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 import asyncio
-import json
 import logging
 import os
 import subprocess
@@ -209,7 +208,7 @@ def scan_phone(ctx, phones):
                 )
             db.complete_scan(scan_id, len(results))
             if results:
-                console.print(f"  [green]Info gathered[/green]")
+                console.print("  [green]Info gathered[/green]")
                 for r in results:
                     if r.details:
                         for k, v in r.details.items():
@@ -582,7 +581,7 @@ def accounts_find_by_email(ctx, email, config_path):
                     data_classes = r.details.get("data_classes", [])
                     console.print(f"  [bold]{breach_name}[/bold]: Change your password immediately")
                     if "Passwords" in data_classes:
-                        console.print(f"    [red]Passwords were exposed[/red] - change on ALL sites where you reused this password")
+                        console.print("    [red]Passwords were exposed[/red] - change on ALL sites where you reused this password")
                     if data_classes:
                         console.print(f"    Compromised data: {', '.join(data_classes)}")
 
@@ -850,7 +849,6 @@ def accounts_exposure_report(ctx, profile_name, config_path):
                     )
                 db.complete_scan(scan_id, len(results))
                 breaches = [r for r in results if r.data_type == "breach"]
-                pastes = [r for r in results if r.data_type == "paste"]
                 for b in breaches:
                     all_breaches.append((email, b))
             except Exception as e:
@@ -1322,8 +1320,8 @@ def score(ctx):
     # Build score display
     score_text = Text()
     score_text.append(f"  {ps.score}", style=f"bold {score_color}")
-    score_text.append(f" / 100  ", style="dim")
-    score_text.append(f"Grade: ", style="bold white")
+    score_text.append(" / 100  ", style="dim")
+    score_text.append("Grade: ", style="bold white")
     score_text.append(f"{ps.grade}", style=f"bold {score_color}")
 
     console.print()
@@ -1529,7 +1527,7 @@ def schedule_enable(ctx):
     if install_cron(profile_name, config.schedule):
         console.print(f"[green]Cron jobs installed for profile '{profile_name}'.[/green]")
         console.print(f"  Re-scan: {config.schedule.cron_time}")
-        console.print(f"  Follow-up check: daily at 9 AM")
+        console.print("  Follow-up check: daily at 9 AM")
     else:
         console.print("[red]Failed to install cron jobs.[/red]")
 

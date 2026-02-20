@@ -2,9 +2,7 @@
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
-from unittest.mock import patch
 
 import pytest
 import yaml
@@ -12,7 +10,6 @@ import yaml
 from src.config import (
     BROKERS_DIR,
     Config,
-    _resolve_env,
     load_all_brokers,
     load_broker,
     load_profile,

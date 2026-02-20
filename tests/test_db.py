@@ -193,7 +193,7 @@ class TestGetRemovalRequests:
     def test_get_removal_requests_by_status(self, tmp_db):
         """Filter removal requests by status."""
         rid1 = tmp_db.create_removal("user1", "broker1", "Broker 1", "email")
-        rid2 = tmp_db.create_removal("user1", "broker2", "Broker 2", "email")
+        tmp_db.create_removal("user1", "broker2", "Broker 2", "email")
         tmp_db.update_removal_status(rid1, "submitted")
 
         pending = tmp_db.get_removals(status="pending")

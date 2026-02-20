@@ -6,7 +6,6 @@ import csv
 import json
 from pathlib import Path
 
-import pytest
 
 from src.reporting.csv_export import export_findings_csv, export_removals_csv
 from src.reporting.html_export import export_findings_html, export_removals_html

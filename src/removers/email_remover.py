@@ -10,7 +10,6 @@ import time
 import uuid
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
@@ -58,8 +57,8 @@ class EmailRemover:
                 data_types_found.add(details["query_type"])
 
         # Also include the broker's own declared data types
-        for dt in broker.data_types:
-            data_types_found.add(dt)
+        for data_type in broker.data_types:
+            data_types_found.add(data_type)
 
         return {
             "listing_urls": listing_urls[:5],  # cap at 5
