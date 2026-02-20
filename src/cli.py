@@ -1093,6 +1093,142 @@ def remove_form(ctx, broker, headed, dry_run):
         console.print(f"[red]Failed: {result.get('error', 'unknown')}[/red]")
 
 
+@remove.command("follow-up")
+@click.option("--dry-run", is_flag=True, help="List overdue brokers without sending emails")
+@click.option("--days", default=None, type=int, help="Override expected_days threshold for all brokers")
+@click.pass_context
+def remove_follow_up(ctx, dry_run, days):
+    """Send follow-up emails for overdue removal requests."""
+    profile_name = ctx.obj["profile_name"]
+    if not profile_name:
+        console.print("[red]Profile required. Use -p <name>[/red]")
+        return
+
+    try:
+        profile = load_profile(profile_name)
+    except FileNotFoundError:
+        console.print(f"[red]Profile '{profile_name}' not found.[/red]")
+        return
+
+    config = ctx.obj["config"]
+    db = ctx.obj["db"]
+
+    # Query overdue removals
+    overdue = db.get_overdue_removals(profile=profile_name, days_threshold=days)
+
+    if not overdue:
+        console.print(f"[green]No overdue removal requests found for profile '{profile_name}'.[/green]")
+        return
+
+    console.print(f"\n[bold]Found {len(overdue)} overdue removal request(s) for profile '{profile_name}'[/bold]\n")
+
+    if dry_run:
+        console.print("[yellow]DRY RUN -- no emails will be sent[/yellow]\n")
+
+    from src.removers.email_remover import EmailRemover
+    remover = EmailRemover(config.smtp, db)
+
+    # Build results table
+    table = Table(title="Follow-Up Results")
+    table.add_column("Broker", style="bold", min_width=20)
+    table.add_column("Submitted", width=12)
+    table.add_column("Days Overdue", width=14, justify="right")
+    table.add_column("Follow-up Status", min_width=18)
+
+    sent_count = 0
+    error_count = 0
+
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        console=console,
+        transient=True,
+    ) as progress:
+        task = progress.add_task("Processing follow-ups...", total=len(overdue))
+
+        for removal in overdue:
+            broker_slug = removal["broker_slug"]
+            broker_name = removal.get("broker_name", broker_slug)
+            submitted_at = removal.get("submitted_at", "")[:10]
+
+            # Calculate days overdue
+            days_overdue = 0
+            if removal.get("submitted_at"):
+                try:
+                    submitted_dt = datetime.fromisoformat(removal["submitted_at"])
+                    days_overdue = (datetime.now() - submitted_dt).days
+                except (ValueError, TypeError):
+                    days_overdue = 0
+
+            progress.update(task, description=f"Processing {broker_name}...")
+
+            if dry_run:
+                table.add_row(
+                    broker_name,
+                    submitted_at,
+                    str(days_overdue),
+                    "[yellow]Would send[/yellow]",
+                )
+                progress.advance(task)
+                continue
+
+            # Load the broker YAML
+            try:
+                broker = load_broker(broker_slug)
+            except FileNotFoundError:
+                logger.warning("Broker YAML not found for slug=%s, skipping follow-up", broker_slug)
+                table.add_row(
+                    broker_name,
+                    submitted_at,
+                    str(days_overdue),
+                    "[red]Broker YAML missing[/red]",
+                )
+                error_count += 1
+                progress.advance(task)
+                continue
+
+            if not broker.email_method:
+                table.add_row(
+                    broker_name,
+                    submitted_at,
+                    str(days_overdue),
+                    "[dim]No email method[/dim]",
+                )
+                progress.advance(task)
+                continue
+
+            # Send the follow-up
+            result = remover.send_follow_up(removal, profile, broker)
+
+            if result.get("success"):
+                sent_count += 1
+                table.add_row(
+                    broker_name,
+                    submitted_at,
+                    str(days_overdue),
+                    "[green]Sent[/green]",
+                )
+            else:
+                error_count += 1
+                err_msg = result.get("error", "unknown error")
+                table.add_row(
+                    broker_name,
+                    submitted_at,
+                    str(days_overdue),
+                    f"[red]{err_msg}[/red]",
+                )
+
+            progress.advance(task)
+
+    console.print(table)
+
+    if dry_run:
+        console.print(f"\n[bold]{len(overdue)} broker(s) would receive follow-up emails.[/bold]")
+        console.print("Remove --dry-run to actually send.")
+    else:
+        console.print(f"\n[bold]Follow-up complete:[/bold] {sent_count} sent, {error_count} failed")
+
+
 @remove.command("manual")
 @click.pass_context
 def remove_manual(ctx):
@@ -1154,6 +1290,77 @@ def track_reappeared(ctx, removal_id):
     db = ctx.obj["db"]
     db.update_removal_status(removal_id, "reappeared")
     console.print(f"[yellow]Removal #{removal_id} marked as reappeared. Re-submit removal.[/yellow]")
+
+
+# ============================================================================
+# SCORE COMMAND
+# ============================================================================
+
+@cli.command("score")
+@click.pass_context
+def score(ctx):
+    """Calculate and display your privacy exposure score."""
+    profile_name = ctx.obj["profile_name"]
+    if not profile_name:
+        console.print("[red]Profile required. Use: privacy-toolkit score -p <name>[/red]")
+        return
+
+    db = ctx.obj["db"]
+
+    from src.scoring import calculate_score
+
+    ps = calculate_score(db, profile_name)
+
+    # Color based on grade
+    if ps.grade in ("A", "B"):
+        score_color = "green"
+    elif ps.grade == "C":
+        score_color = "yellow"
+    else:
+        score_color = "red"
+
+    # Build score display
+    score_text = Text()
+    score_text.append(f"  {ps.score}", style=f"bold {score_color}")
+    score_text.append(f" / 100  ", style="dim")
+    score_text.append(f"Grade: ", style="bold white")
+    score_text.append(f"{ps.grade}", style=f"bold {score_color}")
+
+    console.print()
+    console.print(Panel(
+        score_text,
+        title=f"Privacy Score: {profile_name}",
+        border_style=score_color,
+        padding=(1, 2),
+    ))
+
+    # Stats breakdown
+    stats_table = Table(show_header=False, box=None, padding=(0, 2))
+    stats_table.add_column("Label", style="bold", min_width=22)
+    stats_table.add_column("Value", justify="right")
+    stats_table.add_row("Total findings", str(ps.findings_count))
+    stats_table.add_row("Data breaches", f"[red]{ps.breaches_count}[/red]" if ps.breaches_count else "0")
+    stats_table.add_row("Broker listings", f"[red]{ps.broker_listings}[/red]" if ps.broker_listings else "0")
+    stats_table.add_row("Accounts found", str(ps.accounts_found))
+    stats_table.add_row("Removals confirmed", f"[green]{ps.removals_confirmed}[/green]" if ps.removals_confirmed else "0")
+    stats_table.add_row("Removals pending", f"[yellow]{ps.removals_pending}[/yellow]" if ps.removals_pending else "0")
+
+    console.print()
+    console.print(Panel(stats_table, title="Breakdown", border_style="blue"))
+
+    # Risk factors
+    if ps.risk_factors:
+        risk_lines = "\n".join(f"  [red]-[/red] {rf}" for rf in ps.risk_factors)
+        console.print()
+        console.print(Panel(risk_lines, title="Risk Factors", border_style="red"))
+
+    # Recommendations
+    if ps.recommendations:
+        rec_lines = "\n".join(f"  [cyan]{i+1}.[/cyan] {rec}" for i, rec in enumerate(ps.recommendations))
+        console.print()
+        console.print(Panel(rec_lines, title="Recommendations", border_style="cyan"))
+
+    console.print()
 
 
 # ============================================================================

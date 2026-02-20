@@ -294,19 +294,71 @@ class Database:
         conn.close()
         return [dict(r) for r in rows]
 
-    def get_overdue_removals(self, days: int = 45) -> list[dict]:
-        """Get submitted removals older than N days with no confirmation (need follow-up)."""
-        cutoff = (datetime.now() - timedelta(days=days)).isoformat()
+    def get_overdue_removals(
+        self,
+        profile: Optional[str] = None,
+        days_threshold: Optional[int] = None,
+    ) -> list[dict]:
+        """Get submitted removals that are overdue and eligible for follow-up.
+
+        A removal is overdue when:
+          - status = 'submitted'
+          - submitted_at + recheck_days < current date (uses days_threshold
+            override if provided, otherwise falls back to the recheck_at column
+            which was set from broker.verification.expected_days)
+          - no 'follow_up_sent' note within the last 30 days
+
+        Args:
+            profile: Filter by profile name (optional).
+            days_threshold: Override the per-broker expected_days with a flat
+                            threshold in days.  When provided, a removal is
+                            overdue if submitted_at + days_threshold < now.
+        """
         conn = self._connect()
-        rows = conn.execute(
-            """SELECT * FROM removal_requests
-            WHERE status='submitted' AND submitted_at <= ?
-            AND notes NOT LIKE '%follow_up_sent%'
-            ORDER BY submitted_at ASC""",
-            (cutoff,),
-        ).fetchall()
+
+        if days_threshold is not None:
+            # Flat cutoff: submitted more than days_threshold days ago
+            cutoff = (datetime.now() - timedelta(days=days_threshold)).isoformat()
+            query = """SELECT * FROM removal_requests
+                WHERE status='submitted'
+                AND submitted_at <= ?"""
+            params: list[Any] = [cutoff]
+        else:
+            # Per-broker cutoff: recheck_at is set to submitted_at + expected_days
+            # at creation time.  Overdue when recheck_at <= now.
+            query = """SELECT * FROM removal_requests
+                WHERE status='submitted'
+                AND recheck_at <= ?"""
+            params = [datetime.now().isoformat()]
+
+        if profile:
+            query += " AND profile=?"
+            params.append(profile)
+
+        query += " ORDER BY submitted_at ASC"
+        rows = conn.execute(query, params).fetchall()
         conn.close()
-        return [dict(r) for r in rows]
+
+        # Post-filter: exclude removals where a follow-up was already sent
+        # within the last 30 days.
+        results = []
+        recent_cutoff = (datetime.now() - timedelta(days=30)).strftime("%Y-%m-%d")
+        for row in rows:
+            d = dict(row)
+            notes = d.get("notes") or ""
+            # Check if any follow_up_sent:<date> entry is within last 30 days
+            skip = False
+            for part in notes.split(";"):
+                part = part.strip()
+                if part.startswith("follow_up_sent:"):
+                    sent_date = part.split(":", 1)[1].strip()
+                    if sent_date >= recent_cutoff:
+                        skip = True
+                        break
+            if not skip:
+                results.append(d)
+
+        return results
 
     def get_pending_rechecks(self, profile: Optional[str] = None) -> list[dict]:
         conn = self._connect()

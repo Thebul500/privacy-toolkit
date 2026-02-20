@@ -23,6 +23,7 @@ from src.config import (
 )
 from src.db import Database
 from src.models import Profile
+from src.scoring import calculate_score
 from src.tasks import TaskManager, TaskStatus, run_email_removals, run_full_scan
 
 GUIDES_DIR = TOOLKIT_DIR / "guides"
@@ -88,6 +89,16 @@ async def dashboard(request: Request):
 
     active = [t for t in task_manager.list_tasks() if t.status == TaskStatus.RUNNING]
 
+    # Calculate privacy score for first profile (if any)
+    privacy_score = None
+    score_profile = None
+    if profiles_list:
+        score_profile = profiles_list[0]
+        try:
+            privacy_score = calculate_score(db, score_profile)
+        except Exception as e:
+            logger.warning("Failed to calculate privacy score for %s: %s", score_profile, e)
+
     return templates.TemplateResponse("dashboard.html", {
         "request": request,
         "active": "dashboard",
@@ -101,6 +112,8 @@ async def dashboard(request: Request):
         },
         "recent_activity": audit,
         "active_tasks": active,
+        "privacy_score": privacy_score,
+        "score_profile": score_profile,
     })
 
 

@@ -25,6 +25,7 @@ RUN chmod +x bin/phoneinfoga 2>/dev/null || true
 COPY src/ src/
 COPY templates/ templates/
 COPY brokers/ brokers/
+COPY guides/ guides/
 
 # Default config/data/profiles will be mounted as volumes
 RUN mkdir -p config/profiles data/logs data/scans data/screenshots

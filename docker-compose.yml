@@ -9,6 +9,7 @@ services:
       - ./config:/app/config
       - ./brokers:/app/brokers
       - ./templates:/app/templates
+      - ./guides:/app/guides
     restart: unless-stopped
 
 networks:
