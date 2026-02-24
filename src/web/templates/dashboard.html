@@ -29,7 +29,7 @@
 <div class="{{ bg_class }} rounded-lg p-5 border {{ border_class }} mb-8">
     <div class="flex items-center justify-between">
         <div>
-            <div class="text-dark-300 text-xs font-medium uppercase tracking-wide mb-1">Privacy Score{% if score_profile %} &mdash; {{ score_profile }}{% endif %}</div>
+            <div class="text-dark-300 text-xs font-semibold uppercase tracking-wider mb-1">Privacy Score{% if score_profile %} &mdash; {{ score_profile }}{% endif %}</div>
             <div class="flex items-baseline gap-3">
                 <span class="text-5xl font-bold {{ text_class }}">{{ ps.score }}</span>
                 <span class="text-dark-300 text-lg">/&nbsp;100</span>
@@ -45,7 +45,7 @@
     </div>
     {% if ps.risk_factors %}
     <div class="mt-3 pt-3 border-t border-dark-600">
-        <div class="text-xs text-dark-300 uppercase tracking-wide mb-1">Top Risks</div>
+        <div class="text-xs text-dark-300 uppercase tracking-wider mb-1">Top Risks</div>
         <div class="flex flex-wrap gap-2">
             {% for rf in ps.risk_factors[:5] %}
             <span class="text-xs px-2 py-0.5 rounded bg-dark-600 text-dark-100">{{ rf }}</span>
@@ -61,27 +61,27 @@
 
 <!-- Stats Cards -->
 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-    <div class="bg-dark-700 rounded-lg p-4 border border-dark-600">
-        <div class="text-dark-300 text-xs font-medium uppercase tracking-wide">Profiles</div>
+    <div class="stat-card">
+        <div class="text-dark-300 text-xs font-semibold uppercase tracking-wider">Profiles</div>
         <div class="text-2xl font-bold text-white mt-1">{{ stats.profiles }}</div>
     </div>
-    <div class="bg-dark-700 rounded-lg p-4 border border-dark-600">
-        <div class="text-dark-300 text-xs font-medium uppercase tracking-wide">Total Findings</div>
+    <div class="stat-card">
+        <div class="text-dark-300 text-xs font-semibold uppercase tracking-wider">Total Findings</div>
         <div class="text-2xl font-bold text-red-400 mt-1">{{ stats.findings }}</div>
     </div>
-    <div class="bg-dark-700 rounded-lg p-4 border border-dark-600">
-        <div class="text-dark-300 text-xs font-medium uppercase tracking-wide">Removals Sent</div>
+    <div class="stat-card">
+        <div class="text-dark-300 text-xs font-semibold uppercase tracking-wider">Removals Sent</div>
         <div class="text-2xl font-bold text-yellow-400 mt-1">{{ stats.removals_submitted }}</div>
     </div>
-    <div class="bg-dark-700 rounded-lg p-4 border border-dark-600">
-        <div class="text-dark-300 text-xs font-medium uppercase tracking-wide">Confirmed Removed</div>
+    <div class="stat-card">
+        <div class="text-dark-300 text-xs font-semibold uppercase tracking-wider">Confirmed Removed</div>
         <div class="text-2xl font-bold text-green-400 mt-1">{{ stats.removals_confirmed }}</div>
     </div>
 </div>
 
 <!-- Removal status breakdown -->
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-    <div class="bg-dark-700 rounded-lg border border-dark-600 p-5">
+    <div class="card p-5">
         <h3 class="text-sm font-semibold text-white mb-3">Removal Status Breakdown</h3>
         <div class="space-y-2">
             {% for status, count in stats.removal_breakdown.items() %}
@@ -99,12 +99,16 @@
             </div>
             {% endfor %}
             {% if not stats.removal_breakdown %}
-            <p class="text-dark-300 text-sm">No removal requests yet.</p>
+            <div class="empty-state">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+                <p class="empty-title">No removal requests yet</p>
+                <p class="empty-hint">Run a scan and send opt-out requests to get started</p>
+            </div>
             {% endif %}
         </div>
     </div>
 
-    <div class="bg-dark-700 rounded-lg border border-dark-600 p-5">
+    <div class="card p-5">
         <h3 class="text-sm font-semibold text-white mb-3">Quick Actions</h3>
         <div class="space-y-2">
             {% if stats.profile_names %}
@@ -118,15 +122,19 @@
             </form>
             {% endfor %}
             {% else %}
-            <p class="text-dark-300 text-sm">Create a profile to start scanning.</p>
-            <a href="/profiles" class="inline-block mt-2 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 rounded text-sm text-white transition-colors">Create Profile</a>
+            <div class="empty-state">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+                <p class="empty-title">Create a profile to start scanning</p>
+                <p class="empty-hint">Profiles define the identities you want to monitor</p>
+                <a href="/profiles" class="btn-primary mt-3 text-xs">Create Profile</a>
+            </div>
             {% endif %}
         </div>
     </div>
 </div>
 
 <!-- Recent Activity -->
-<div class="bg-dark-700 rounded-lg border border-dark-600">
+<div class="card">
     <div class="px-5 py-3 border-b border-dark-600">
         <h3 class="text-sm font-semibold text-white">Recent Activity</h3>
     </div>
@@ -143,14 +151,18 @@
         </div>
         {% endfor %}
         {% if not recent_activity %}
-        <div class="px-5 py-8 text-center text-dark-300 text-sm">No activity yet. Run a scan to get started.</div>
+        <div class="empty-state">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+            <p class="empty-title">No activity yet</p>
+            <p class="empty-hint">Run a scan to get started</p>
+        </div>
         {% endif %}
     </div>
 </div>
 
 <!-- Active Tasks -->
 {% if active_tasks %}
-<div class="mt-6 bg-dark-700 rounded-lg border border-dark-600">
+<div class="mt-6 card">
     <div class="px-5 py-3 border-b border-dark-600">
         <h3 class="text-sm font-semibold text-white">Running Tasks</h3>
     </div>

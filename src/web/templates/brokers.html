@@ -16,23 +16,23 @@
     <a href="/brokers?priority=low" class="px-3 py-1 rounded text-xs font-medium transition-colors {% if filter_priority == 'low' %}bg-dark-500 text-dark-200{% else %}bg-dark-700 text-dark-300 hover:bg-dark-600{% endif %}">Low</a>
 </div>
 
-<div class="bg-dark-700 rounded-lg border border-dark-600">
+<div class="card">
     {% if brokers %}
     <div class="overflow-x-auto">
         <table class="w-full text-sm">
             <thead>
                 <tr class="border-b border-dark-600 text-dark-300 text-xs uppercase">
-                    <th class="px-5 py-2 text-left">Broker</th>
-                    <th class="px-5 py-2 text-left">Category</th>
-                    <th class="px-5 py-2 text-left">Priority</th>
-                    <th class="px-5 py-2 text-left">Opt-Out Methods</th>
-                    <th class="px-5 py-2 text-left">Data Types</th>
-                    <th class="px-5 py-2 text-right">Reappearance</th>
+                    <th class="px-5 py-2 text-left font-semibold tracking-wider">Broker</th>
+                    <th class="px-5 py-2 text-left font-semibold tracking-wider">Category</th>
+                    <th class="px-5 py-2 text-left font-semibold tracking-wider">Priority</th>
+                    <th class="px-5 py-2 text-left font-semibold tracking-wider">Opt-Out Methods</th>
+                    <th class="px-5 py-2 text-left font-semibold tracking-wider">Data Types</th>
+                    <th class="px-5 py-2 text-right font-semibold tracking-wider">Reappearance</th>
                 </tr>
             </thead>
             <tbody class="divide-y divide-dark-600">
                 {% for b in brokers %}
-                <tr class="hover:bg-dark-600">
+                <tr>
                     <td class="px-5 py-2">
                         <div class="font-medium text-white">{{ b.name }}</div>
                         <div class="text-xs text-dark-300 font-mono">{{ b.slug }}</div>
@@ -62,7 +62,11 @@
         </table>
     </div>
     {% else %}
-    <div class="px-5 py-8 text-center text-dark-300 text-sm">No brokers found{% if filter_priority %} with priority "{{ filter_priority }}"{% endif %}.</div>
+    <div class="empty-state">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+        <p class="empty-title">No brokers found{% if filter_priority %} with priority "{{ filter_priority }}"{% endif %}</p>
+        <p class="empty-hint">Check your broker YAML configuration files</p>
+    </div>
     {% endif %}
 </div>
 {% endblock %}

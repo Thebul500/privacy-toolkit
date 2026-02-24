@@ -165,10 +165,14 @@ async def create_profile(
     try:
         path = validate_safe_name(name, PROFILES_DIR, "profile")
     except ValueError as e:
-        return await profiles_page(request, message=str(e), message_type="error")
+        return RedirectResponse(
+            f"/profiles?message={str(e)}&message_type=error", status_code=303
+        )
     if path.exists():
-        return await profiles_page(request, message=f"Profile '{name}' already exists.",
-                                   message_type="error")
+        return RedirectResponse(
+            f"/profiles?message=Profile+'{name}'+already+exists.&message_type=error",
+            status_code=303,
+        )
 
     email_list = [e.strip() for e in emails.split(",") if e.strip()]
     phone_list = [p.strip() for p in phones.split(",") if p.strip()]
@@ -598,7 +602,7 @@ async def confirm_removal(request: Request, removal_id: int):
                 <td class="px-5 py-2 text-right">
                     <form method="post" action="/removals/{r['id']}/reappeared" class="inline"
                           hx-post="/removals/{r['id']}/reappeared" hx-target="#removal-{r['id']}" hx-swap="outerHTML">
-                        <button type="submit" class="px-2 py-0.5 text-xs bg-red-800 hover:bg-red-700 rounded text-red-200 transition-colors">
+                        <button type="submit" class="btn-danger text-xs px-2 py-0.5">
                             Reappeared
                         </button>
                     </form>

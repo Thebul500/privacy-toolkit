@@ -68,22 +68,22 @@
         <table class="w-full text-sm">
             <thead>
                 <tr class="border-b border-dark-600 text-dark-300 text-xs uppercase">
-                    <th class="px-5 py-2 text-left w-10">#</th>
+                    <th class="px-5 py-2 text-left w-10 font-semibold tracking-wider">#</th>
                     {% if search_type == "email" %}
-                    <th class="px-5 py-2 text-left">Service / Breach</th>
-                    <th class="px-5 py-2 text-left">Type</th>
-                    <th class="px-5 py-2 text-left">Data Exposed</th>
-                    <th class="px-5 py-2 text-left">Action</th>
+                    <th class="px-5 py-2 text-left font-semibold tracking-wider">Service / Breach</th>
+                    <th class="px-5 py-2 text-left font-semibold tracking-wider">Type</th>
+                    <th class="px-5 py-2 text-left font-semibold tracking-wider">Data Exposed</th>
+                    <th class="px-5 py-2 text-left font-semibold tracking-wider">Action</th>
                     {% elif search_type == "phone" %}
-                    <th class="px-5 py-2 text-left">Service / Source</th>
-                    <th class="px-5 py-2 text-left">Type</th>
-                    <th class="px-5 py-2 text-left">Details</th>
-                    <th class="px-5 py-2 text-left">Action</th>
+                    <th class="px-5 py-2 text-left font-semibold tracking-wider">Service / Source</th>
+                    <th class="px-5 py-2 text-left font-semibold tracking-wider">Type</th>
+                    <th class="px-5 py-2 text-left font-semibold tracking-wider">Details</th>
+                    <th class="px-5 py-2 text-left font-semibold tracking-wider">Action</th>
                     {% elif search_type == "username" %}
-                    <th class="px-5 py-2 text-left">Site</th>
-                    <th class="px-5 py-2 text-left">URL</th>
-                    <th class="px-5 py-2 text-left">Confidence</th>
-                    <th class="px-5 py-2 text-left">Action</th>
+                    <th class="px-5 py-2 text-left font-semibold tracking-wider">Site</th>
+                    <th class="px-5 py-2 text-left font-semibold tracking-wider">URL</th>
+                    <th class="px-5 py-2 text-left font-semibold tracking-wider">Confidence</th>
+                    <th class="px-5 py-2 text-left font-semibold tracking-wider">Action</th>
                     {% endif %}
                 </tr>
             </thead>

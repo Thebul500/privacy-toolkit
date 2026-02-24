@@ -12,7 +12,7 @@
 
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
     <!-- Identity Info -->
-    <div class="bg-dark-700 rounded-lg border border-dark-600 p-5">
+    <div class="card p-5">
         <h3 class="text-sm font-semibold text-white mb-3">Identity</h3>
         <dl class="space-y-2 text-sm">
             <div class="flex gap-2">
@@ -35,7 +35,7 @@
     </div>
 
     <!-- Contact Info -->
-    <div class="bg-dark-700 rounded-lg border border-dark-600 p-5">
+    <div class="card p-5">
         <h3 class="text-sm font-semibold text-white mb-3">Contact Details</h3>
         <dl class="space-y-2 text-sm">
             <div class="flex gap-2">
@@ -64,16 +64,16 @@
 
 <!-- Stats for this profile -->
 <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-    <div class="bg-dark-700 rounded-lg p-4 border border-dark-600">
-        <div class="text-dark-300 text-xs font-medium uppercase tracking-wide">Findings</div>
+    <div class="stat-card">
+        <div class="text-dark-300 text-xs font-semibold uppercase tracking-wider">Findings</div>
         <div class="text-2xl font-bold text-red-400 mt-1">{{ findings_count }}</div>
     </div>
-    <div class="bg-dark-700 rounded-lg p-4 border border-dark-600">
-        <div class="text-dark-300 text-xs font-medium uppercase tracking-wide">Scans Run</div>
+    <div class="stat-card">
+        <div class="text-dark-300 text-xs font-semibold uppercase tracking-wider">Scans Run</div>
         <div class="text-2xl font-bold text-white mt-1">{{ scans|length }}</div>
     </div>
-    <div class="bg-dark-700 rounded-lg p-4 border border-dark-600">
-        <div class="text-dark-300 text-xs font-medium uppercase tracking-wide">Removals</div>
+    <div class="stat-card">
+        <div class="text-dark-300 text-xs font-semibold uppercase tracking-wider">Removals</div>
         <div class="text-2xl font-bold text-yellow-400 mt-1">{{ removals|length }}</div>
     </div>
 </div>
@@ -81,8 +81,9 @@
 <!-- Quick Actions -->
 <div class="flex gap-3 mb-6">
     <form method="post" action="/scans/trigger">
+        <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
         <input type="hidden" name="profile" value="{{ profile.name }}">
-        <button type="submit" class="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 rounded text-sm text-white font-medium transition-colors">
+        <button type="submit" class="btn-primary">
             Run Full Scan
         </button>
     </form>
@@ -90,24 +91,24 @@
 
 <!-- Recent Scans -->
 {% if scans %}
-<div class="bg-dark-700 rounded-lg border border-dark-600 mb-6">
+<div class="card mb-6">
     <div class="px-5 py-3 border-b border-dark-600">
         <h3 class="text-sm font-semibold text-white">Recent Scans</h3>
     </div>
     <table class="w-full text-sm">
         <thead>
             <tr class="border-b border-dark-600 text-dark-300 text-xs uppercase">
-                <th class="px-5 py-2 text-left">Scanner</th>
-                <th class="px-5 py-2 text-left">Type</th>
-                <th class="px-5 py-2 text-left">Query</th>
-                <th class="px-5 py-2 text-left">Status</th>
-                <th class="px-5 py-2 text-right">Results</th>
-                <th class="px-5 py-2 text-right">Date</th>
+                <th class="px-5 py-2 text-left font-semibold tracking-wider">Scanner</th>
+                <th class="px-5 py-2 text-left font-semibold tracking-wider">Type</th>
+                <th class="px-5 py-2 text-left font-semibold tracking-wider">Query</th>
+                <th class="px-5 py-2 text-left font-semibold tracking-wider">Status</th>
+                <th class="px-5 py-2 text-right font-semibold tracking-wider">Results</th>
+                <th class="px-5 py-2 text-right font-semibold tracking-wider">Date</th>
             </tr>
         </thead>
         <tbody class="divide-y divide-dark-600">
             {% for s in scans[:10] %}
-            <tr class="hover:bg-dark-600">
+            <tr>
                 <td class="px-5 py-2 font-mono">{{ s.scanner }}</td>
                 <td class="px-5 py-2">{{ s.scan_type }}</td>
                 <td class="px-5 py-2 text-dark-200 truncate max-w-48">{{ s.query }}</td>

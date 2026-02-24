@@ -9,27 +9,21 @@
     </div>
 </div>
 
-{% if message %}
-<div class="mb-4 px-4 py-2 rounded text-sm {% if message_type == 'error' %}bg-red-900/50 text-red-300 border border-red-800{% else %}bg-blue-900/50 text-blue-300 border border-blue-800{% endif %}">
-    {{ message }}
-</div>
-{% endif %}
-
 <!-- Send Email Removals -->
 {% if profiles %}
-<div class="bg-dark-700 rounded-lg border border-dark-600 mb-6 p-5">
+<div class="card mb-6 p-5">
     <h3 class="text-sm font-semibold text-white mb-3">Send Email Removal Requests</h3>
     <form method="post" action="/removals/email" class="flex items-end gap-3">
         <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
         <div>
-            <label class="block text-xs text-dark-300 mb-1">Profile</label>
-            <select name="profile" class="bg-dark-800 border border-dark-500 rounded px-3 py-1.5 text-sm text-white focus:border-blue-500 focus:outline-none">
+            <label class="block text-xs font-medium text-dark-300 mb-1.5">Profile</label>
+            <select name="profile" class="bg-dark-800 border border-dark-500 rounded px-3 py-1.5 text-sm text-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 focus:outline-none">
                 {% for p in profiles %}
                 <option value="{{ p }}">{{ p }}</option>
                 {% endfor %}
             </select>
         </div>
-        <button type="submit" class="px-4 py-1.5 bg-yellow-600 hover:bg-yellow-500 rounded text-sm text-white font-medium transition-colors">
+        <button type="submit" class="btn-warning">
             Send to All Brokers
         </button>
     </form>
@@ -46,25 +40,25 @@
 </div>
 
 <!-- Removal Table -->
-<div class="bg-dark-700 rounded-lg border border-dark-600">
+<div class="card">
     {% if removals %}
     <div class="overflow-x-auto">
         <table class="w-full text-sm">
             <thead>
                 <tr class="border-b border-dark-600 text-dark-300 text-xs uppercase">
-                    <th class="px-5 py-2 text-left">ID</th>
-                    <th class="px-5 py-2 text-left">Profile</th>
-                    <th class="px-5 py-2 text-left">Broker</th>
-                    <th class="px-5 py-2 text-left">Method</th>
-                    <th class="px-5 py-2 text-left">Status</th>
-                    <th class="px-5 py-2 text-left">Submitted</th>
-                    <th class="px-5 py-2 text-left">Recheck</th>
-                    <th class="px-5 py-2 text-right">Actions</th>
+                    <th class="px-5 py-2 text-left font-semibold tracking-wider">ID</th>
+                    <th class="px-5 py-2 text-left font-semibold tracking-wider">Profile</th>
+                    <th class="px-5 py-2 text-left font-semibold tracking-wider">Broker</th>
+                    <th class="px-5 py-2 text-left font-semibold tracking-wider">Method</th>
+                    <th class="px-5 py-2 text-left font-semibold tracking-wider">Status</th>
+                    <th class="px-5 py-2 text-left font-semibold tracking-wider">Submitted</th>
+                    <th class="px-5 py-2 text-left font-semibold tracking-wider">Recheck</th>
+                    <th class="px-5 py-2 text-right font-semibold tracking-wider">Actions</th>
                 </tr>
             </thead>
             <tbody class="divide-y divide-dark-600">
                 {% for r in removals %}
-                <tr class="hover:bg-dark-600" id="removal-{{ r.id }}">
+                <tr id="removal-{{ r.id }}">
                     <td class="px-5 py-2 font-mono text-dark-300">#{{ r.id }}</td>
                     <td class="px-5 py-2">{{ r.profile }}</td>
                     <td class="px-5 py-2 font-medium text-white">{{ r.broker_name }}</td>
@@ -88,7 +82,7 @@
                         <form method="post" action="/removals/{{ r.id }}/confirm" class="inline"
                               hx-post="/removals/{{ r.id }}/confirm" hx-target="#removal-{{ r.id }}" hx-swap="outerHTML">
                             <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
-                            <button type="submit" class="px-2 py-0.5 text-xs bg-green-800 hover:bg-green-700 rounded text-green-200 transition-colors">
+                            <button type="submit" class="btn-success text-xs px-2 py-0.5">
                                 Confirm
                             </button>
                         </form>
@@ -97,7 +91,7 @@
                         <form method="post" action="/removals/{{ r.id }}/reappeared" class="inline"
                               hx-post="/removals/{{ r.id }}/reappeared" hx-target="#removal-{{ r.id }}" hx-swap="outerHTML">
                             <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
-                            <button type="submit" class="px-2 py-0.5 text-xs bg-red-800 hover:bg-red-700 rounded text-red-200 transition-colors">
+                            <button type="submit" class="btn-danger text-xs px-2 py-0.5">
                                 Reappeared
                             </button>
                         </form>
@@ -109,7 +103,11 @@
         </table>
     </div>
     {% else %}
-    <div class="px-5 py-8 text-center text-dark-300 text-sm">No removal requests{% if filter_status %} with status "{{ filter_status }}"{% endif %}.</div>
+    <div class="empty-state">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+        <p class="empty-title">No removal requests{% if filter_status %} with status "{{ filter_status }}"{% endif %}</p>
+        <p class="empty-hint">Run a scan first, then send opt-out requests to brokers</p>
+    </div>
     {% endif %}
 </div>
 {% endblock %}

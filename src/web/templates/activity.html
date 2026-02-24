@@ -7,22 +7,22 @@
     <p class="text-dark-300 text-sm mt-1">Audit trail of all actions</p>
 </div>
 
-<div class="bg-dark-700 rounded-lg border border-dark-600">
+<div class="card">
     {% if entries %}
     <div class="overflow-x-auto">
         <table class="w-full text-sm">
             <thead>
                 <tr class="border-b border-dark-600 text-dark-300 text-xs uppercase">
-                    <th class="px-5 py-2 text-left">Timestamp</th>
-                    <th class="px-5 py-2 text-left">Action</th>
-                    <th class="px-5 py-2 text-left">Profile</th>
-                    <th class="px-5 py-2 text-left">Details</th>
-                    <th class="px-5 py-2 text-center">Status</th>
+                    <th class="px-5 py-2 text-left font-semibold tracking-wider">Timestamp</th>
+                    <th class="px-5 py-2 text-left font-semibold tracking-wider">Action</th>
+                    <th class="px-5 py-2 text-left font-semibold tracking-wider">Profile</th>
+                    <th class="px-5 py-2 text-left font-semibold tracking-wider">Details</th>
+                    <th class="px-5 py-2 text-center font-semibold tracking-wider">Status</th>
                 </tr>
             </thead>
             <tbody class="divide-y divide-dark-600">
                 {% for e in entries %}
-                <tr class="hover:bg-dark-600">
+                <tr>
                     <td class="px-5 py-2 font-mono text-xs text-dark-300 whitespace-nowrap">{{ e.timestamp[:19] }}</td>
                     <td class="px-5 py-2 font-medium text-dark-100">{{ e.action|replace('_', ' ')|title }}</td>
                     <td class="px-5 py-2 text-dark-200">{{ e.profile or '—' }}</td>
@@ -37,7 +37,11 @@
         </table>
     </div>
     {% else %}
-    <div class="px-5 py-8 text-center text-dark-300 text-sm">No activity logged yet.</div>
+    <div class="empty-state">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+        <p class="empty-title">No activity logged yet</p>
+        <p class="empty-hint">Actions like scans, profile creation, and removals will appear here</p>
+    </div>
     {% endif %}
 </div>
 {% endblock %}

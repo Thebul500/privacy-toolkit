@@ -142,9 +142,10 @@ class TestCreateProfile:
                 "emails": "",
                 "phones": "",
                 "usernames": "",
-            })
-        assert resp.status_code == 200
-        assert "Unsafe name" in resp.text
+            }, follow_redirects=False)
+        assert resp.status_code == 303
+        loc = resp.headers.get("location", "")
+        assert "Unsafe" in loc and "name" in loc
 
     def test_create_profile_duplicate(self, app_client):
         app_module = app_client._app_module
@@ -160,9 +161,9 @@ class TestCreateProfile:
                 "emails": "",
                 "phones": "",
                 "usernames": "",
-            })
-        assert resp.status_code == 200
-        assert "already exists" in resp.text
+            }, follow_redirects=False)
+        assert resp.status_code == 303
+        assert "already+exists" in resp.headers.get("location", "")
 
 
 class TestProfileDetail:
