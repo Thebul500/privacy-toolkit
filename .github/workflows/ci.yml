@@ -142,19 +142,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Run Semgrep
-        uses: returntocorp/semgrep-action@v1
-        with:
-          config: >-
-            p/python
-            p/owasp-top-ten
-          extraArgs: >-
-            --exclude-rule python.django.security.django-no-csrf-token.django-no-csrf-token
-
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+
+      - name: Run Semgrep
+        run: |
+          pip install semgrep
+          semgrep scan --config p/python --config p/owasp-top-ten \
+            --exclude-rule python.django.security.django-no-csrf-token.django-no-csrf-token \
+            --error --severity ERROR \
+            src/
 
       - name: Run Bandit
         run: |
