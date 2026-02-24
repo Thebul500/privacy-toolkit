@@ -16,8 +16,10 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 from src.config import (
     Config,
+    DEFAULT_CONFIG,
     PROFILES_DIR,
     TOOLKIT_DIR,
+    is_setup_complete,
     load_all_brokers,
     load_profile,
     list_profiles,
@@ -26,7 +28,7 @@ from src.config import (
 from src.db import Database
 from src.models import Profile
 from src.scoring import calculate_score
-from src.tasks import TaskManager, TaskStatus, run_email_removals, run_full_scan
+from src.tasks import TaskManager, TaskStatus, run_email_removals, run_full_scan, run_url_discovery
 
 GUIDES_DIR = TOOLKIT_DIR / "guides"
 
@@ -80,10 +82,11 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         return response
 
 
-from src.auth import APIKeyMiddleware
+from src.auth import APIKeyMiddleware, PasswordAuthMiddleware, _password_hash
 from src.csrf import CSRFMiddleware
 app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(CSRFMiddleware)
+app.add_middleware(PasswordAuthMiddleware)
 app.add_middleware(APIKeyMiddleware)
 
 app.mount("/static", StaticFiles(directory=str(WEB_DIR / "static")), name="static")
@@ -94,6 +97,7 @@ def _ctx(request: Request, **kwargs) -> dict:
     """Build a template context dict with the CSRF token injected."""
     kwargs["request"] = request
     kwargs["csrf_token"] = getattr(request.state, "csrf_token", "")
+    kwargs.setdefault("setup_needed", not is_setup_complete()["all_complete"])
     return kwargs
 
 
@@ -103,6 +107,9 @@ def _ctx(request: Request, **kwargs) -> dict:
 
 @app.get("/", response_class=HTMLResponse)
 async def dashboard(request: Request):
+    if not is_setup_complete()["all_complete"]:
+        return RedirectResponse("/setup", status_code=303)
+
     profiles_list = list_profiles()
     findings_count = db.get_findings_count()
     removals = db.get_removals()
@@ -177,6 +184,7 @@ async def create_profile(
     emails: str = Form(""),
     phones: str = Form(""),
     usernames: str = Form(""),
+    redirect: str = Form(""),
 ):
     try:
         path = validate_safe_name(name, PROFILES_DIR, "profile")
@@ -206,6 +214,8 @@ async def create_profile(
     )
     p.to_yaml(path)
     db.log("profile_created", name)
+    if redirect and redirect.startswith("/"):
+        return RedirectResponse(redirect, status_code=303)
     return RedirectResponse(f"/profiles/{name}", status_code=303)
 
 
@@ -687,6 +697,8 @@ async def reappeared_removal(request: Request, removal_id: int):
 
 @app.get("/brokers", response_class=HTMLResponse)
 async def brokers_page(request: Request, priority: Optional[str] = None):
+    from src.scanners.people_search_scanner import SITE_BY_SLUG
+
     brokers = load_all_brokers()
     if priority:
         brokers = [b for b in brokers if b.priority.value == priority]
@@ -700,7 +712,73 @@ async def brokers_page(request: Request, priority: Optional[str] = None):
         active="brokers",
         brokers=brokers,
         filter_priority=priority,
+        scanner_slugs=set(SITE_BY_SLUG.keys()),
+        profiles=list_profiles(),
     ))
+
+
+@app.post("/brokers/{slug}/verify", response_class=HTMLResponse)
+async def verify_broker_listing(request: Request, slug: str, profile: str = Form("")):
+    """HTMX endpoint: scan a single broker to check for profile listings."""
+    from src.scanners.people_search_scanner import has_scanner_config, scan_single
+
+    if not has_scanner_config(slug):
+        return HTMLResponse(
+            '<div class="px-3 py-2 mt-1 rounded text-xs bg-dark-600 text-dark-300">'
+            'No scanner config for this broker.</div>'
+        )
+
+    # Use provided profile or first available
+    profiles_list = list_profiles()
+    profile_name = profile or (profiles_list[0] if profiles_list else "")
+    if not profile_name:
+        return HTMLResponse(
+            '<div class="px-3 py-2 mt-1 rounded text-xs bg-yellow-900/50 text-yellow-300">'
+            'No profile available. Create a profile first.</div>'
+        )
+
+    try:
+        loaded_profile = load_profile(profile_name)
+    except FileNotFoundError:
+        return HTMLResponse(
+            f'<div class="px-3 py-2 mt-1 rounded text-xs bg-red-900/50 text-red-300">'
+            f'Profile "{profile_name}" not found.</div>'
+        )
+
+    import asyncio
+    try:
+        findings = await scan_single(loaded_profile, slug)
+    except Exception as e:
+        logger.error("Verify listing failed for %s/%s: %s", profile_name, slug, e)
+        return HTMLResponse(
+            f'<div class="px-3 py-2 mt-1 rounded text-xs bg-red-900/50 text-red-300">'
+            f'Scan failed: {e}</div>'
+        )
+
+    if findings:
+        # Save to DB
+        scan_id = db.create_scan(profile_name, "people_search", "verify", slug)
+        for f in findings:
+            db.add_finding(
+                scan_id, profile_name, f.scanner, f.site_name,
+                f.site_url, f.data_type, f.details, f.confidence,
+            )
+        db.complete_scan(scan_id, len(findings))
+
+        urls_html = "".join(
+            f'<a href="{f.site_url}" target="_blank" rel="noopener" '
+            f'class="text-blue-400 hover:text-blue-300 underline block truncate">{f.site_url}</a>'
+            for f in findings if f.site_url
+        )
+        return HTMLResponse(
+            f'<div class="px-3 py-2 mt-1 rounded text-xs bg-red-900/50 text-red-300">'
+            f'Found {len(findings)} listing(s):{urls_html}</div>'
+        )
+
+    return HTMLResponse(
+        '<div class="px-3 py-2 mt-1 rounded text-xs bg-green-900/50 text-green-300">'
+        'No listing found for this profile.</div>'
+    )
 
 
 @app.get("/activity", response_class=HTMLResponse)
@@ -712,6 +790,160 @@ async def activity_page(request: Request):
         active="activity",
         entries=entries,
     ))
+
+
+# ---------------------------------------------------------------------------
+# SETUP WIZARD
+# ---------------------------------------------------------------------------
+
+
+@app.get("/setup", response_class=HTMLResponse)
+async def setup_page(request: Request, step: int = 1):
+    step = max(1, min(step, 4))
+    status = is_setup_complete()
+    smtp_username = ""
+    if status["config_exists"]:
+        try:
+            cfg = Config.load()
+            smtp_username = cfg.smtp.username
+        except Exception:
+            pass
+    return templates.TemplateResponse("setup.html", _ctx(
+        request,
+        active="setup",
+        step=step,
+        setup_status=status,
+        smtp_username=smtp_username,
+    ))
+
+
+@app.post("/setup/smtp")
+async def setup_smtp(
+    smtp_username: str = Form(...),
+    smtp_password: str = Form(...),
+):
+    import shutil
+    import yaml
+
+    config_path = DEFAULT_CONFIG
+    if not config_path.exists():
+        example = TOOLKIT_DIR / "config" / "config.yaml.example"
+        if example.exists():
+            shutil.copy(example, config_path)
+        else:
+            config_path.parent.mkdir(parents=True, exist_ok=True)
+            config_path.write_text("")
+
+    with open(config_path) as f:
+        data = yaml.safe_load(f) or {}
+
+    data.setdefault("smtp", {})
+    data["smtp"]["username"] = smtp_username
+    data["smtp"]["password"] = smtp_password
+    data["smtp"]["from_email"] = smtp_username
+    data["smtp"].setdefault("from_name", "Privacy Toolkit")
+    data["smtp"].setdefault("host", "smtp.gmail.com")
+    data["smtp"].setdefault("port", 587)
+    data["smtp"].setdefault("use_tls", True)
+
+    with open(config_path, "w") as f:
+        yaml.dump(data, f, default_flow_style=False, sort_keys=False)
+
+    # Reload config
+    global config
+    config = Config.load()
+
+    return RedirectResponse("/setup?step=3", status_code=303)
+
+
+@app.post("/setup/smtp-test", response_class=HTMLResponse)
+async def setup_smtp_test(
+    request: Request,
+    smtp_username: str = Form(""),
+    smtp_password: str = Form(""),
+):
+    if not smtp_username or not smtp_password:
+        return HTMLResponse(
+            '<div class="callout-warning mt-3 text-sm">Please enter both email and password.</div>'
+        )
+
+    import smtplib
+    try:
+        with smtplib.SMTP("smtp.gmail.com", 587, timeout=10) as server:
+            server.ehlo()
+            server.starttls()
+            server.login(smtp_username, smtp_password)
+        return HTMLResponse(
+            '<div class="px-3 py-2 mt-3 rounded bg-green-900/50 border border-green-700 text-green-200 text-sm">'
+            'Connection successful! Gmail credentials are valid.</div>'
+        )
+    except smtplib.SMTPAuthenticationError:
+        return HTMLResponse(
+            '<div class="callout-warning mt-3 text-sm">'
+            'Authentication failed. Check your App Password (not your regular Gmail password).</div>'
+        )
+    except Exception as e:
+        return HTMLResponse(
+            f'<div class="callout-warning mt-3 text-sm">Connection failed: {e}</div>'
+        )
+
+
+@app.post("/setup/skip-smtp")
+async def setup_skip_smtp():
+    import shutil
+
+    config_path = DEFAULT_CONFIG
+    if not config_path.exists():
+        example = TOOLKIT_DIR / "config" / "config.yaml.example"
+        if example.exists():
+            shutil.copy(example, config_path)
+        else:
+            config_path.parent.mkdir(parents=True, exist_ok=True)
+            config_path.write_text("")
+
+    global config
+    config = Config.load()
+
+    return RedirectResponse("/setup?step=3", status_code=303)
+
+
+@app.post("/setup/complete")
+async def setup_complete():
+    db.log("setup_completed")
+    return RedirectResponse("/?message=Setup+complete!&message_type=success", status_code=303)
+
+
+# ---------------------------------------------------------------------------
+# LOGIN
+# ---------------------------------------------------------------------------
+
+
+@app.get("/login", response_class=HTMLResponse)
+async def login_page(request: Request, error: Optional[str] = None):
+    return templates.TemplateResponse("login.html", _ctx(
+        request,
+        active="",
+        error=error,
+    ))
+
+
+@app.post("/login")
+async def login_submit(password: str = Form(...)):
+    import os
+    expected = os.environ.get("PRIVACY_TOOLKIT_PASSWORD", "")
+    if not expected or password != expected:
+        return RedirectResponse(
+            "/login?error=Invalid+password", status_code=303
+        )
+    token = _password_hash(password)
+    response = RedirectResponse("/", status_code=303)
+    response.set_cookie(
+        "_ptk_session", token,
+        httponly=True,
+        samesite="strict",
+        path="/",
+    )
+    return response
 
 
 # ---------------------------------------------------------------------------

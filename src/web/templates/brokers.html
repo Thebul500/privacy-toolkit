@@ -28,6 +28,7 @@
                     <th class="px-5 py-2 text-left font-semibold tracking-wider">Opt-Out Methods</th>
                     <th class="px-5 py-2 text-left font-semibold tracking-wider">Data Types</th>
                     <th class="px-5 py-2 text-right font-semibold tracking-wider">Reappearance</th>
+                    <th class="px-5 py-2 text-right font-semibold tracking-wider">Verify</th>
                 </tr>
             </thead>
             <tbody class="divide-y divide-dark-600">
@@ -56,6 +57,19 @@
                     </td>
                     <td class="px-5 py-2 text-dark-300 text-xs">{{ b.data_types|join(', ') }}</td>
                     <td class="px-5 py-2 text-right text-dark-300 font-mono text-xs">{{ b.reappearance_days }}d</td>
+                    <td class="px-5 py-2 text-right">
+                        {% if b.slug in scanner_slugs %}
+                        <div id="verify-{{ b.slug }}">
+                            <form hx-post="/brokers/{{ b.slug }}/verify" hx-target="#verify-{{ b.slug }}" hx-swap="innerHTML">
+                                <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+                                <input type="hidden" name="profile" value="{{ profiles[0] if profiles else '' }}">
+                                <button type="submit" class="text-xs px-2 py-0.5 rounded bg-blue-900/50 text-blue-300 hover:bg-blue-800/50 transition-colors">
+                                    Check Listing
+                                </button>
+                            </form>
+                        </div>
+                        {% endif %}
+                    </td>
                 </tr>
                 {% endfor %}
             </tbody>

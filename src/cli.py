@@ -278,6 +278,77 @@ def scan_people(ctx, query, query_type):
         console.print(f"[red]Scan failed: {e}[/red]")
 
 
+@scan.command("verify-listing")
+@click.option("--broker", "-b", required=True, help="Broker slug to verify (e.g. radaris)")
+@click.pass_context
+def scan_verify_listing(ctx, broker):
+    """Check if your profile appears on a specific data broker site."""
+    import asyncio
+    from src.scanners.people_search_scanner import has_scanner_config, scan_single
+
+    db = ctx.obj["db"]
+    profile_name = ctx.obj["profile_name"]
+    if not profile_name:
+        console.print("[red]Profile required. Use: privacy-toolkit scan verify-listing -p <name> --broker <slug>[/red]")
+        return
+
+    if not has_scanner_config(broker):
+        console.print(f"[red]No scanner config for broker '{broker}'.[/red]")
+        console.print("Available brokers with scanner configs:")
+        from src.scanners.people_search_scanner import SITE_BY_SLUG
+        for slug in sorted(SITE_BY_SLUG.keys()):
+            console.print(f"  {slug}")
+        return
+
+    try:
+        profile = load_profile(profile_name)
+    except FileNotFoundError:
+        console.print(f"[red]Profile '{profile_name}' not found.[/red]")
+        return
+
+    console.print(f"\n[bold]Checking {broker} for profile: {profile_name}[/bold]")
+
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        console=console,
+    ) as progress:
+        task = progress.add_task(f"Scanning {broker}...", total=None)
+        try:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                findings = loop.run_until_complete(scan_single(profile, broker))
+            finally:
+                loop.close()
+            progress.update(task, description=f"Done — {len(findings)} result(s)")
+        except Exception as e:
+            progress.update(task, description=f"Failed: {e}")
+            console.print(f"[red]Scan failed: {e}[/red]")
+            return
+
+    if findings:
+        # Save to DB
+        scan_id = db.create_scan(profile_name, "people_search", "verify", broker)
+        for f in findings:
+            db.add_finding(
+                scan_id, profile_name, f.scanner, f.site_name,
+                f.site_url, f.data_type, f.details, f.confidence,
+            )
+        db.complete_scan(scan_id, len(findings))
+
+        console.print(f"\n[red bold]Found on {broker}:[/red bold]")
+        table = Table(show_header=True, header_style="bold")
+        table.add_column("Site")
+        table.add_column("URL")
+        table.add_column("Type")
+        for f in findings:
+            table.add_row(f.site_name, f.site_url, f.data_type)
+        console.print(table)
+    else:
+        console.print(f"\n[green]Not found on {broker}.[/green]")
+
+
 @scan.command("full")
 @click.pass_context
 def scan_full(ctx):
@@ -1772,6 +1843,140 @@ def brokers_validate():
         f"\n[bold]Summary:[/bold] {ok_count} OK, {warn_count} warnings, "
         f"{fail_count} failures out of {ok_count + warn_count + fail_count} brokers"
     )
+
+
+# ============================================================================
+# SETUP COMMAND
+# ============================================================================
+
+
+@cli.command("setup")
+@click.pass_context
+def setup(ctx):
+    """Interactive setup wizard — get from install to first scan in minutes."""
+    import shutil
+    import smtplib
+
+    import yaml
+
+    from src.config import DEFAULT_CONFIG, PROFILES_DIR, is_setup_complete
+
+    config_obj = ctx.obj["config"]
+
+    console.print(Panel(
+        "[bold]Welcome to Privacy Toolkit Setup[/bold]\n\n"
+        "This wizard will help you:\n"
+        "  1. Create a configuration file\n"
+        "  2. Set up email for automated opt-out requests\n"
+        "  3. Create your first profile\n"
+        "  4. Run a dependency check",
+        title="Setup Wizard",
+        border_style="blue",
+    ))
+
+    status = is_setup_complete()
+
+    # Step 1 — Config file
+    console.print("\n[bold cyan]Step 1: Configuration File[/bold cyan]")
+    if status["config_exists"]:
+        console.print("  [green]Config file already exists.[/green]")
+    else:
+        example = DEFAULT_CONFIG.parent / "config.yaml.example"
+        if example.exists():
+            shutil.copy(example, DEFAULT_CONFIG)
+            console.print(f"  [green]Created config from example:[/green] {DEFAULT_CONFIG}")
+        else:
+            DEFAULT_CONFIG.parent.mkdir(parents=True, exist_ok=True)
+            DEFAULT_CONFIG.write_text("")
+            console.print(f"  [green]Created empty config:[/green] {DEFAULT_CONFIG}")
+        config_obj = Config.load()
+
+    # Step 2 — SMTP
+    console.print("\n[bold cyan]Step 2: Email Setup (Gmail)[/bold cyan]")
+    if status["smtp_configured"]:
+        console.print("  [green]SMTP already configured.[/green]")
+    else:
+        console.print("  To send opt-out emails, you need a Gmail App Password.")
+        console.print("  Get one at: [blue]https://myaccount.google.com/apppasswords[/blue]")
+        do_smtp = click.confirm("  Set up email now?", default=True)
+        if do_smtp:
+            email_addr = click.prompt("  Gmail address")
+            app_password = click.prompt("  App Password", hide_input=True)
+
+            console.print("  Testing connection...", end=" ")
+            try:
+                with smtplib.SMTP("smtp.gmail.com", 587, timeout=10) as server:
+                    server.ehlo()
+                    server.starttls()
+                    server.login(email_addr, app_password)
+                console.print("[green]Success![/green]")
+            except Exception as e:
+                console.print(f"[red]Failed: {e}[/red]")
+                console.print("  You can fix this later in config/config.yaml")
+
+            # Save to config
+            with open(DEFAULT_CONFIG) as f:
+                data = yaml.safe_load(f) or {}
+            data.setdefault("smtp", {})
+            data["smtp"]["username"] = email_addr
+            data["smtp"]["password"] = app_password
+            data["smtp"]["from_email"] = email_addr
+            data["smtp"].setdefault("from_name", "Privacy Toolkit")
+            data["smtp"].setdefault("host", "smtp.gmail.com")
+            data["smtp"].setdefault("port", 587)
+            data["smtp"].setdefault("use_tls", True)
+            with open(DEFAULT_CONFIG, "w") as f:
+                yaml.dump(data, f, default_flow_style=False, sort_keys=False)
+            config_obj = Config.load()
+            console.print("  [green]Saved to config/config.yaml[/green]")
+        else:
+            console.print("  Skipped. You can set up email later.")
+
+    # Step 3 — Profile
+    console.print("\n[bold cyan]Step 3: Create Profile[/bold cyan]")
+    if status["has_profiles"]:
+        names = list_profiles()
+        console.print(f"  [green]Profiles exist:[/green] {', '.join(names)}")
+    else:
+        do_profile = click.confirm("  Create your first profile?", default=True)
+        if do_profile:
+            name = click.prompt("  Profile name (e.g. john-doe)")
+            first_name = click.prompt("  First name", default="")
+            last_name = click.prompt("  Last name", default="")
+            email = click.prompt("  Email address", default="")
+
+            full = f"{first_name} {last_name}".strip()
+            p = Profile(
+                name=name,
+                first_name=first_name,
+                last_name=last_name,
+                full_name=full,
+                email_addresses=[e.strip() for e in email.split(",") if e.strip()],
+            )
+            PROFILES_DIR.mkdir(parents=True, exist_ok=True)
+            path = PROFILES_DIR / f"{name}.yaml"
+            p.to_yaml(path)
+            console.print(f"  [green]Created profile:[/green] {path}")
+        else:
+            console.print("  Skipped. Create one later with: privacy-toolkit profile create <name>")
+
+    # Step 4 — Doctor
+    console.print("\n[bold cyan]Step 4: Dependency Check[/bold cyan]")
+    ctx.invoke(doctor)
+
+    # Summary
+    final = is_setup_complete()
+    console.print(Panel(
+        "[bold]Setup Complete![/bold]\n\n"
+        "Next steps:\n"
+        "  [cyan]privacy-toolkit scan full[/cyan]      — run a full scan\n"
+        "  [cyan]privacy-toolkit web[/cyan]             — start the web dashboard\n"
+        "  [cyan]privacy-toolkit remove email[/cyan]    — send opt-out emails\n\n"
+        + ("[green]All checks passed![/green]" if final["all_complete"]
+           else "[yellow]Some steps still need attention — run the web wizard at /setup[/yellow]"),
+        title="Done",
+        border_style="green" if final["all_complete"] else "yellow",
+    ))
 
 
 # ============================================================================

@@ -49,8 +49,64 @@ class EmailRemover:
             autoescape=select_autoescape(default=True, default_for_string=True),
         )
 
+    def _discover_listing_url(self, profile: Profile, broker_slug: str) -> list[str]:
+        """Try to find profile listing URL on the broker's site.
+
+        Checks DB first; if no URLs found there and a scanner config
+        exists for this broker, runs a targeted single-site scan and
+        persists the results.
+        """
+        from src.scanners.people_search_scanner import has_scanner_config, scan_single
+
+        existing = self.db.get_findings_for_broker(profile.name, broker_slug)
+        urls = [f["site_url"] for f in existing if f.get("site_url")]
+        if urls:
+            return urls
+
+        if not has_scanner_config(broker_slug):
+            return []
+
+        # Run targeted scan for this single broker
+        try:
+            import asyncio
+            try:
+                loop = asyncio.get_running_loop()
+            except RuntimeError:
+                loop = None
+
+            if loop and loop.is_running():
+                # Already in an async context — can't use run_until_complete
+                logger.debug("Skipping live scan for %s (already in async loop)", broker_slug)
+                return []
+
+            new_loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(new_loop)
+            try:
+                findings = new_loop.run_until_complete(scan_single(profile, broker_slug))
+            finally:
+                new_loop.close()
+
+            # Persist findings for future use
+            if findings:
+                scan_id = self.db.create_scan(profile.name, "people_search", "verify", broker_slug)
+                for f in findings:
+                    self.db.add_finding(
+                        scan_id, profile.name, f.scanner, f.site_name,
+                        f.site_url, f.data_type, f.details, f.confidence,
+                    )
+                self.db.complete_scan(scan_id, len(findings))
+                return [f.site_url for f in findings if f.site_url]
+
+        except Exception as e:
+            logger.warning("URL discovery failed for broker=%s: %s", broker_slug, e)
+
+        return []
+
     def _gather_evidence(self, broker: Broker, profile: Profile) -> dict:
         """Look up scan findings for this broker to include in the email."""
+        # Try to discover listing URLs if none exist in DB
+        discovered_urls = self._discover_listing_url(profile, broker.slug)
+
         findings = self.db.get_findings_for_broker(profile.name, broker.slug)
         listing_urls = []
         data_types_found = set()
@@ -64,6 +120,11 @@ class EmailRemover:
             details = f.get("details", {})
             if isinstance(details, dict) and details.get("query_type"):
                 data_types_found.add(details["query_type"])
+
+        # Add any discovered URLs not already in the list
+        for url in discovered_urls:
+            if url not in listing_urls:
+                listing_urls.append(url)
 
         # Also include the broker's own declared data types
         for data_type in broker.data_types:

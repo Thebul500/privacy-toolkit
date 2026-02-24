@@ -309,6 +309,36 @@ def run_form_removal(profile_name: str, broker_slug: str, config, db) -> dict:
     return result
 
 
+def run_url_discovery(profile_name: str, broker_slug: str, config, db) -> dict:
+    """Scan a single broker site to discover profile listing URLs."""
+    from src.config import load_profile
+    from src.scanners.people_search_scanner import has_scanner_config, scan_single
+
+    if not has_scanner_config(broker_slug):
+        return {"broker": broker_slug, "found": 0, "error": "No scanner config for this broker"}
+
+    profile = load_profile(profile_name)
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        findings = loop.run_until_complete(scan_single(profile, broker_slug))
+    finally:
+        loop.close()
+
+    if findings:
+        scan_id = db.create_scan(profile_name, "people_search", "verify", broker_slug)
+        for f in findings:
+            db.add_finding(
+                scan_id, profile_name, f.scanner, f.site_name,
+                f.site_url, f.data_type, f.details, f.confidence,
+            )
+        db.complete_scan(scan_id, len(findings))
+
+    urls = [f.site_url for f in findings if f.site_url]
+    db.log("url_discovery", profile_name, {"broker": broker_slug, "urls": urls})
+    return {"broker": broker_slug, "found": len(findings), "urls": urls}
+
+
 def run_follow_ups(config, db) -> dict:
     """Check for overdue removals and send follow-up emails."""
     from src.config import load_broker, load_profile

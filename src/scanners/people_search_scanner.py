@@ -5,9 +5,12 @@ import asyncio
 import logging
 import re
 from datetime import datetime
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 from src.models import ScanResult
+
+if TYPE_CHECKING:
+    from src.models import Profile
 from src.scanners.base import BaseScanner
 
 logger = logging.getLogger(__name__)
@@ -280,6 +283,77 @@ PEOPLE_SEARCH_SITES = [
         "no_result_text": "No results found",
     },
 ]
+
+# O(1) lookup by slug
+SITE_BY_SLUG: dict[str, dict] = {s["slug"]: s for s in PEOPLE_SEARCH_SITES}
+
+
+def has_scanner_config(slug: str) -> bool:
+    """Check if a broker slug has a people-search scanner configuration."""
+    return slug in SITE_BY_SLUG
+
+
+async def scan_single(profile: "Profile", slug: str) -> list[ScanResult]:
+    """Scan a single broker site for a profile, return findings.
+
+    Tries name-based search first (requires first_name + last_name),
+    then phone, then email.  Returns an empty list when the broker
+    slug is unknown or no suitable query data exists on the profile.
+    """
+    site = SITE_BY_SLUG.get(slug)
+    if not site:
+        return []
+
+    scanner = PeopleSearchScanner()
+    if not scanner.is_available():
+        logger.warning("Playwright not available for scan_single(%s)", slug)
+        return []
+
+    # Build query from profile data — try name first, then phone, then email
+    queries: list[tuple[str, str]] = []
+    if profile.first_name and profile.last_name:
+        state = ""
+        if profile.addresses:
+            state = profile.addresses[0].state_abbr or profile.addresses[0].state
+        name_q = f"{profile.first_name} {profile.last_name}"
+        if state:
+            name_q += f" {state}"
+        queries.append((name_q, "name"))
+    if profile.phone_numbers:
+        queries.append((profile.phone_numbers[0], "phone"))
+    if profile.email_addresses:
+        queries.append((profile.email_addresses[0], "email"))
+
+    if not queries:
+        return []
+
+    from playwright.async_api import async_playwright
+
+    results: list[ScanResult] = []
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(headless=True)
+        context = await browser.new_context(
+            user_agent=(
+                "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
+                "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            ),
+            viewport={"width": 1920, "height": 1080},
+        )
+        context.set_default_timeout(30000)
+
+        for query, query_type in queries:
+            try:
+                result = await scanner._check_site(context, site, query, query_type)
+                if result:
+                    results.append(result)
+                    break  # Found a listing, no need to try other query types
+            except Exception as e:
+                logger.warning("scan_single(%s) failed for %s query: %s", slug, query_type, e)
+
+        await browser.close()
+
+    return results
+
 
 # US state name to abbreviation mapping
 STATE_ABBREVS = {
