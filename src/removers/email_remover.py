@@ -454,3 +454,257 @@ class EmailRemover:
             len(unique_bounces), updated,
         )
         return unique_bounces
+
+    # Keywords that indicate the broker wants form/website/CAPTCHA action
+    _FORM_KEYWORDS = re.compile(
+        r"click\s+here|opt[\s-]?out\s+(?:page|form|link|request)|"
+        r"visit\s+(?:our|the|this)\s+(?:website|page|link|portal)|"
+        r"fill\s+(?:out|in)\s+(?:the|a|our)\s+form|"
+        r"captcha|complete\s+(?:the|our|this)\s+(?:form|process|verification)|"
+        r"submit\s+(?:a|your|the)\s+(?:request|form)|"
+        r"go\s+to\s+(?:our|the|this)\s+(?:website|page|url)|"
+        r"use\s+(?:our|the|this)\s+(?:online|web)\s+(?:form|tool|portal)",
+        re.IGNORECASE,
+    )
+
+    # Keywords that indicate identity verification is required
+    _VERIFY_KEYWORDS = re.compile(
+        r"proof\s+of\s+identity|verify\s+(?:your|the)\s+identity|"
+        r"provide\s+(?:a\s+)?(?:copy\s+of\s+)?(?:your\s+)?(?:photo\s+)?id|"
+        r"government[\s-]issued\s+id|driver.s?\s+license|"
+        r"identity\s+verification|confirm\s+(?:your\s+)?identity|"
+        r"notarized|identification\s+document",
+        re.IGNORECASE,
+    )
+
+    # Keywords that indicate no records found
+    _NO_RECORDS_KEYWORDS = re.compile(
+        r"unable\s+to\s+locate|no\s+records?\s+(?:found|matching|located)|"
+        r"could\s+not\s+(?:find|locate)|not\s+(?:found|in\s+our)\s+(?:system|database|records)|"
+        r"no\s+(?:matching\s+)?(?:data|information|profile|listing)\s+(?:found|located)|"
+        r"were\s+unable\s+to\s+(?:find|locate)",
+        re.IGNORECASE,
+    )
+
+    # Keywords that indicate the request was completed
+    _COMPLETED_KEYWORDS = re.compile(
+        r"has\s+been\s+(?:completed|processed|fulfilled|removed|deleted)|"
+        r"successfully\s+(?:removed|deleted|opted[\s-]?out)|"
+        r"your\s+(?:data|information|records?|profile|listing)\s+(?:has|have)\s+been\s+(?:removed|deleted)|"
+        r"removal\s+(?:is\s+)?(?:complete|confirmed)|"
+        r"opt[\s-]?out\s+(?:is\s+)?(?:complete|confirmed|processed)",
+        re.IGNORECASE,
+    )
+
+    def _classify_response(self, body: str) -> tuple[str, str]:
+        """Classify a broker response into a category and extract key detail.
+
+        Returns (category, detail) where category is one of:
+        - needs_form: broker wants you to use a website/form/CAPTCHA
+        - needs_verification: broker wants identity proof
+        - no_records: broker says they have no data on you
+        - completed: broker confirms deletion
+        - acknowledged: auto-reply or ticket created, waiting
+        """
+        # Strip HTML tags for keyword matching
+        text = re.sub(r"<[^>]+>", " ", body)
+        text = re.sub(r"\s+", " ", text)
+
+        # Check in priority order (most actionable first)
+        m = self._VERIFY_KEYWORDS.search(text)
+        if m:
+            # Extract surrounding context
+            start = max(0, m.start() - 40)
+            end = min(len(text), m.end() + 80)
+            return "needs_verification", text[start:end].strip()
+
+        m = self._FORM_KEYWORDS.search(text)
+        if m:
+            start = max(0, m.start() - 40)
+            end = min(len(text), m.end() + 80)
+            # Try to extract URL near the keyword
+            url_match = re.search(r"https?://\S+", text[max(0, m.start() - 100):m.end() + 200])
+            detail = text[start:end].strip()
+            if url_match:
+                detail += f" — URL: {url_match.group(0).rstrip('.,)>')}"
+            return "needs_form", detail
+
+        m = self._COMPLETED_KEYWORDS.search(text)
+        if m:
+            start = max(0, m.start() - 40)
+            end = min(len(text), m.end() + 80)
+            return "completed", text[start:end].strip()
+
+        m = self._NO_RECORDS_KEYWORDS.search(text)
+        if m:
+            start = max(0, m.start() - 40)
+            end = min(len(text), m.end() + 80)
+            return "no_records", text[start:end].strip()
+
+        return "acknowledged", ""
+
+    def check_responses(self, imap_host: str = "imap.gmail.com") -> list[dict]:
+        """Check Gmail IMAP for broker replies to removal requests.
+
+        Finds emails that reply to privacy-toolkit message IDs, classifies
+        them (needs_form, needs_verification, completed, no_records,
+        acknowledged), and updates removal_request notes.
+
+        Returns a list of dicts with response details.
+        """
+        if not self.smtp.username or not self.smtp.password:
+            logger.warning("SMTP credentials not configured, cannot check responses")
+            return []
+
+        responses: list[dict] = []
+
+        try:
+            mail = imaplib.IMAP4_SSL(imap_host)
+            mail.login(self.smtp.username, self.smtp.password)
+            mail.select("INBOX")
+
+            # Search for replies referencing privacy-toolkit
+            searches = [
+                '(HEADER In-Reply-To "privacy-toolkit")',
+                '(SUBJECT "deletion request")',
+                '(SUBJECT "opt-out")',
+            ]
+
+            seen_ids: set[bytes] = set()
+            raw_messages = []
+
+            for query in searches:
+                status, data = mail.search(None, query)
+                if status != "OK" or not data[0]:
+                    continue
+                for mid in data[0].split():
+                    if mid in seen_ids:
+                        continue
+                    seen_ids.add(mid)
+                    status2, msg_data = mail.fetch(mid, "(RFC822)")
+                    if status2 != "OK":
+                        continue
+                    raw_messages.append(msg_data[0][1])
+
+            mail.logout()
+
+        except imaplib.IMAP4.error as e:
+            logger.error("IMAP connection failed: %s", e)
+            return []
+        except Exception as e:
+            logger.error("Response check failed: %s", e)
+            return []
+
+        # Build lookup of our message IDs to removal requests
+        removals = self.db.get_removals(status="submitted")
+        msgid_to_removal: dict[str, dict] = {}
+        for r in removals:
+            mid = r.get("email_message_id", "")
+            if mid:
+                msgid_to_removal[mid] = r
+
+        # Also build broker email → removal lookup
+        from src.config import load_all_brokers
+        broker_email_to_slug: dict[str, str] = {}
+        for broker in load_all_brokers():
+            method = broker.email_method
+            if method:
+                broker_email_to_slug[method.address.lower()] = broker.slug
+
+        slug_to_removal: dict[str, dict] = {}
+        for r in removals:
+            slug_to_removal.setdefault(r.get("broker_slug", ""), r)
+
+        for raw in raw_messages:
+            try:
+                msg = email_lib.message_from_bytes(raw)
+                from_addr = msg.get("From", "")
+                subject = msg.get("Subject", "")
+                date = msg.get("Date", "")
+                in_reply_to = msg.get("In-Reply-To", "")
+
+                # Skip our own sent messages
+                if self.smtp.username and self.smtp.username in from_addr:
+                    continue
+                # Skip bounce messages (handled by check_bounces)
+                from_lower = from_addr.lower()
+                if "mailer-daemon" in from_lower or "postmaster" in from_lower:
+                    continue
+
+                # Extract body
+                body = ""
+                if msg.is_multipart():
+                    for part in msg.walk():
+                        ct = part.get_content_type()
+                        if ct == "text/plain":
+                            payload = part.get_payload(decode=True)
+                            if payload:
+                                body = payload.decode("utf-8", errors="replace")
+                                break
+                        elif ct == "text/html" and not body:
+                            payload = part.get_payload(decode=True)
+                            if payload:
+                                body = payload.decode("utf-8", errors="replace")
+                else:
+                    payload = msg.get_payload(decode=True)
+                    if payload:
+                        body = payload.decode("utf-8", errors="replace")
+
+                if not body:
+                    continue
+
+                # Match to a removal request
+                matched_removal = None
+                # Try In-Reply-To match first
+                if in_reply_to and in_reply_to in msgid_to_removal:
+                    matched_removal = msgid_to_removal[in_reply_to]
+                else:
+                    # Try matching sender domain to broker
+                    sender_match = re.search(r"[\w.-]+@[\w.-]+", from_addr)
+                    if sender_match:
+                        sender_email = sender_match.group(0).lower()
+                        # Check sender domain against broker domains
+                        sender_domain = sender_email.split("@")[1]
+                        for broker_email, slug in broker_email_to_slug.items():
+                            broker_domain = broker_email.split("@")[1]
+                            # Match if domains share a root (e.g., spokeo.zendesk.com → spokeo)
+                            if (broker_domain in sender_domain
+                                    or sender_domain in broker_domain
+                                    or slug in sender_domain):
+                                if slug in slug_to_removal:
+                                    matched_removal = slug_to_removal[slug]
+                                    break
+
+                category, detail = self._classify_response(body)
+
+                response = {
+                    "from": from_addr,
+                    "date": date,
+                    "subject": subject,
+                    "category": category,
+                    "detail": detail,
+                    "broker": matched_removal.get("broker_name", "Unknown") if matched_removal else "Unknown",
+                    "broker_slug": matched_removal.get("broker_slug", "") if matched_removal else "",
+                    "removal_id": matched_removal.get("id") if matched_removal else None,
+                }
+                responses.append(response)
+
+                # Update removal notes if matched
+                if matched_removal and category != "acknowledged":
+                    try:
+                        notes = matched_removal.get("notes") or ""
+                        tag = f"response:{category}:{time.strftime('%Y-%m-%d')}"
+                        if tag not in notes:
+                            new_notes = f"{notes}; {tag}" if notes else tag
+                            self.db.update_removal_status(
+                                matched_removal["id"], "submitted",
+                                notes=new_notes,
+                            )
+                    except ValueError:
+                        pass
+
+            except Exception as e:
+                logger.debug("Failed to parse response message: %s", e)
+
+        logger.info("Response check: %d responses found", len(responses))
+        return responses

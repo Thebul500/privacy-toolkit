@@ -1323,6 +1323,56 @@ def track_bounces(ctx):
     console.print("\n[dim]Matching removal requests have been marked as rejected.[/dim]")
 
 
+@track.command("responses")
+@click.pass_context
+def track_responses(ctx):
+    """Check Gmail for broker replies and classify what action is needed."""
+    from src.removers.email_remover import EmailRemover
+    config = ctx.obj["config"]
+    db = ctx.obj["db"]
+    remover = EmailRemover(config.smtp, db)
+    console.print("[blue]Checking Gmail for broker responses...[/blue]")
+    responses = remover.check_responses()
+    if not responses:
+        console.print("[green]No broker responses found.[/green]")
+        return
+
+    # Group by category
+    categories = {
+        "needs_form": ("Needs Form/Website Action", "yellow"),
+        "needs_verification": ("Needs Identity Verification", "red"),
+        "completed": ("Deletion Confirmed", "green"),
+        "no_records": ("No Records Found", "cyan"),
+        "acknowledged": ("Acknowledged (Waiting)", "dim"),
+    }
+
+    grouped: dict[str, list[dict]] = {}
+    for r in responses:
+        grouped.setdefault(r["category"], []).append(r)
+
+    console.print(f"\n[bold]Found {len(responses)} broker response(s):[/bold]\n")
+
+    for cat_key in ["needs_form", "needs_verification", "completed", "no_records", "acknowledged"]:
+        items = grouped.get(cat_key, [])
+        if not items:
+            continue
+        label, color = categories[cat_key]
+        console.print(f"[bold {color}]{label} ({len(items)}):[/bold {color}]")
+        for r in items:
+            broker = r["broker"]
+            rid = f" (#{r['removal_id']})" if r["removal_id"] else ""
+            console.print(f"  [{color}]{broker}{rid}[/{color}] — {r['from']}")
+            if r["detail"]:
+                detail = r["detail"][:120]
+                console.print(f"    [dim]{detail}[/dim]")
+        console.print()
+
+    # Summary
+    action_needed = len(grouped.get("needs_form", [])) + len(grouped.get("needs_verification", []))
+    if action_needed:
+        console.print(f"[bold yellow]{action_needed} response(s) require manual action.[/bold yellow]")
+
+
 # ============================================================================
 # SCORE COMMAND
 # ============================================================================
