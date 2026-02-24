@@ -1304,6 +1304,25 @@ def track_reappeared(ctx, removal_id):
     console.print(f"[yellow]Removal #{removal_id} marked as reappeared. Re-submit removal.[/yellow]")
 
 
+@track.command("bounces")
+@click.pass_context
+def track_bounces(ctx):
+    """Check Gmail for bounced email delivery failures and update removal records."""
+    from src.removers.email_remover import EmailRemover
+    config = ctx.obj["config"]
+    db = ctx.obj["db"]
+    remover = EmailRemover(config.smtp, db)
+    console.print("[blue]Checking Gmail for bounce-back messages...[/blue]")
+    bounces = remover.check_bounces()
+    if not bounces:
+        console.print("[green]No bounced emails found.[/green]")
+        return
+    console.print(f"\n[yellow]Found {len(bounces)} bounced address(es):[/yellow]")
+    for b in bounces:
+        console.print(f"  [red]{b['address']}[/red] — {b['error']}")
+    console.print(f"\n[dim]Matching removal requests have been marked as rejected.[/dim]")
+
+
 # ============================================================================
 # SCORE COMMAND
 # ============================================================================

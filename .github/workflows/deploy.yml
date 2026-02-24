@@ -1,0 +1,43 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Only one deploy at a time
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  # Wait for CI to pass first
+  wait-for-ci:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wait for CI
+        uses: lewagon/wait-on-check-action@v1.3.4
+        with:
+          ref: ${{ github.sha }}
+          check-name: test
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          wait-interval: 10
+
+  deploy:
+    needs: wait-for-ci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger deployment webhook
+        run: |
+          # Option 1: If self-hosted runner exists, this runs deploy-privacy-toolkit.sh directly
+          # Option 2: Trigger N8N webhook to run deployment
+          # Option 3: The cron-based poller on the ghost machine handles it
+          #
+          # For now, log the deployment event. The ghost machine polls for new
+          # commits on main every 5 minutes via cron and auto-deploys.
+          echo "Deployment triggered for commit ${{ github.sha }}"
+          echo "The ghost machine auto-deploy cron will pick this up within 5 minutes"
+          echo ""
+          echo "Commit: ${{ github.sha }}"
+          echo "Message: ${{ github.event.head_commit.message }}"
+          echo "Author: ${{ github.event.head_commit.author.name }}"

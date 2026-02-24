@@ -14,6 +14,7 @@ data/
 # Config secrets
 config/config.yaml
 config/profiles/
+.env
 
 # IDE
 .vscode/

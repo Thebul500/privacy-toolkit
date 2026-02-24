@@ -135,3 +135,38 @@ jobs:
           count = len(list(guide_dir.glob('*.yaml')))
           print(f'All {count} guide files valid')
           "
+
+  security-sast:
+    name: Security SAST
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Semgrep
+        uses: returntocorp/semgrep-action@v1
+        with:
+          config: >-
+            p/python
+            p/owasp-top-ten
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Run Bandit
+        run: |
+          pip install bandit
+          bandit -r src/ --format json --output bandit-results.json -ll || true
+          python -c "
+          import json, sys
+          data = json.load(open('bandit-results.json'))
+          results = data.get('results', [])
+          high = [r for r in results if r['issue_severity'] == 'HIGH']
+          medium = [r for r in results if r['issue_severity'] == 'MEDIUM']
+          if high:
+              for h in high:
+                  print(f\"HIGH: {h['filename']}:{h['line_number']} - {h['issue_text']}\", file=sys.stderr)
+              sys.exit(1)
+          print(f'Bandit: {len(results)} findings ({len(high)} high, {len(medium)} medium) — gate passed')
+          "

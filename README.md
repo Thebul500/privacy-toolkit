@@ -19,7 +19,7 @@ Automated personal data discovery and removal across 78 data brokers and people-
 - **CSV and HTML export** — export findings and removal status in multiple formats
 - **Signal notifications** — scan completion alerts via Signal REST API
 - **Environment variable secrets** — `${ENV_VAR}` syntax and auto-fallback for SMTP, HIBP, Signal credentials
-- **94 tests** — pytest suite covering db, config, models, scanners, notifications, and reporting
+- **177 tests** — pytest suite covering db, config, models, scanners, notifications, security, and reporting
 
 ## Scanners
 
@@ -48,8 +48,13 @@ The installer creates a virtualenv, installs dependencies, downloads PhoneInfoga
 ### Docker
 
 ```bash
+# Copy and fill in OAuth secrets
+cp .env.example .env
+# Edit .env with your GitHub OAuth App credentials
+
 docker-compose up -d
-# Web UI at http://localhost:8384
+# Web UI at http://localhost:8384 (direct)
+# OAuth proxy at http://localhost:4180 (authenticated)
 ```
 
 ### Configuration
@@ -192,6 +197,53 @@ The web UI runs on port 8080 (or 8384 via Docker) and provides:
 - **Brokers** — browse the 78 configured brokers by priority
 - **Activity** — audit log of all actions
 
+## Security
+
+### Authentication
+
+**OAuth2 Proxy** (production) — GitHub OAuth login via [oauth2-proxy](https://oauth2-proxy.github.io/oauth2-proxy/), restricted to allowed GitHub users. Sits in front of the app as a reverse proxy on port 4180.
+
+Setup:
+1. Create a GitHub OAuth App: **Settings > Developer Settings > OAuth Apps > New**
+   - Homepage URL: `https://privacy.bul-network.com`
+   - Callback URL: `https://privacy.bul-network.com/oauth2/callback`
+2. Copy credentials to `.env` (see `.env.example`)
+3. Generate cookie secret: `python3 -c 'import secrets; print(secrets.token_urlsafe(32))'`
+4. Update Nginx Proxy Manager: forward `privacy.bul-network.com` to `oauth2-proxy:4180` instead of `privacy-toolkit:8384`
+5. Remove any existing basic auth access lists
+
+**API Key** (optional) — set `PRIVACY_TOOLKIT_API_KEY` env var to require `X-API-Key` header on all requests. The `/api/health` endpoint is always public.
+
+### CSRF Protection
+
+Double-submit cookie pattern (OWASP). `SameSite=Strict` cookie, validated on all state-changing POST requests. HTMX requests include the token via `X-CSRF-Token` header automatically.
+
+### Security Headers
+
+All responses include:
+- `X-Content-Type-Options: nosniff` — prevents MIME-type sniffing
+- `X-Frame-Options: DENY` — prevents clickjacking
+- `Referrer-Policy: strict-origin-when-cross-origin` — limits referrer leakage
+- `Permissions-Policy: camera=(), microphone=(), geolocation=()` — disables unused browser APIs
+- `X-XSS-Protection: 1; mode=block` — legacy XSS filter
+- `Strict-Transport-Security: max-age=63072000; includeSubDomains` — HSTS (HTTPS only)
+
+### Input Validation
+
+Path traversal prevention on all file operations. Null bytes, `..`, `/`, and `\` are rejected in profile names and broker slugs via `validate_safe_name()`.
+
+### Template Security
+
+Jinja2 auto-escaping enabled globally. CDN scripts pinned with Subresource Integrity (SRI) hashes to prevent CDN tampering.
+
+### TLS
+
+Let's Encrypt certificates via Nginx Proxy Manager with forced HTTPS redirect and HTTP/2.
+
+### Secrets Management
+
+All secrets use `${ENV_VAR}` resolution in config files — no plaintext secrets committed. OAuth credentials stored in `.env` (gitignored).
+
 ## Service Deletion Guides
 
 40 YAML guides in `guides/` with step-by-step account deletion instructions:
@@ -283,14 +335,79 @@ privacy-toolkit/
 ├── guides/                    # 40 service deletion guides
 ├── templates/                 # Legal email templates
 ├── config/                    # Configuration files
-├── tests/                     # 94 pytest tests
+├── tests/                     # 177 pytest tests
 ├── data/                      # SQLite DB, logs, screenshots
 ├── bin/                       # PhoneInfoga binary
-├── .github/workflows/ci.yml   # GitHub Actions CI
+├── .github/workflows/
+│   ├── ci.yml               # CI: lint, test, SAST (Semgrep + Bandit)
+│   ├── security.yml         # Weekly scheduled security scan
+│   └── deploy.yml           # Auto-deploy on merge to main
 ├── Dockerfile
 ├── docker-compose.yml
 ├── requirements.txt
 └── install.sh
+```
+
+## CI/CD Pipeline
+
+### Continuous Integration
+
+Every push and PR triggers:
+- **Ruff** — Python linting (E, F, W rules)
+- **pytest** — 177 tests covering db, config, models, scanners, notifications, security, and reporting
+- **Syntax check** — compile-time validation of all Python source files
+- **Broker validation** — YAML schema validation for all 78 broker definitions
+- **Guide validation** — YAML schema validation for all 40 service deletion guides
+- **Semgrep SAST** — static analysis with `p/python` and `p/owasp-top-ten` rulesets
+- **Bandit** — Python security linter (blocks on HIGH severity findings)
+
+### Weekly Security Scan
+
+Runs every Sunday at 2 AM CST via cron (on-host) and GitHub Actions:
+1. **Semgrep** scans `src/` with `auto`, `p/python`, `p/owasp-top-ten` rulesets
+2. **Bandit** scans for Python-specific security issues
+3. **Claude CLI** auto-remediates findings (Sonnet 4.6, $10 budget cap)
+4. Tests run after each fix — failed fixes are reverted and logged
+5. Creates a PR with all successful fixes
+6. Sends a Signal notification with scan summary
+
+### Monthly Penetration Testing
+
+First Saturday of each month at 3 AM CST:
+1. **Shannon** runs a full exploitation-grade pentest (~$60, 1-2 hours)
+2. Results parsed from Temporal deliverables
+3. Optionally triggers auto-remediation pipeline
+4. Signal notification with findings summary
+
+### Auto-Deploy
+
+On merge to `main`:
+1. Poller detects new commits every 5 minutes
+2. `git pull` + `docker compose build --no-cache` + `docker compose up -d`
+3. Health check: 6 retries at 10s intervals on `/api/health`
+4. On failure: automatic rollback to previous commit
+5. Signal notification for success or failure
+
+### Manual Commands
+
+```bash
+# Run security scan (dry run — scan only, no fixes)
+bash scripts/security-audit.sh --dry-run
+
+# Run full scan with auto-remediation
+bash scripts/security-audit.sh
+
+# Run Shannon pentest (expensive)
+bash scripts/shannon-pentest.sh
+
+# Parse existing Shannon results without re-scanning
+bash scripts/shannon-pentest.sh --skip-scan --remediate
+
+# Manual deploy
+bash scripts/deploy-privacy-toolkit.sh
+
+# Force redeploy even if already up-to-date
+bash scripts/deploy-privacy-toolkit.sh --force
 ```
 
 ## Requirements

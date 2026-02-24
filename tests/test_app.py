@@ -374,6 +374,15 @@ class TestAPIHealth:
         assert "tasks_active" in data
 
 
+class TestSecurityHeaders:
+    def test_security_headers_present(self, app_client):
+        resp = app_client.get("/")
+        assert resp.headers.get("X-Content-Type-Options") == "nosniff"
+        assert resp.headers.get("X-Frame-Options") == "DENY"
+        assert resp.headers.get("Referrer-Policy") == "strict-origin-when-cross-origin"
+        assert "camera=()" in resp.headers.get("Permissions-Policy", "")
+
+
 class TestAPIStats:
     def test_api_stats_keys(self, app_client):
         resp = app_client.get("/api/stats")

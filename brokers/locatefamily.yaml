@@ -10,14 +10,17 @@ data_types:
   - phone
 opt_out:
   methods:
-    - type: email
-      address: privacy@locatefamily.com
-      template: ccpa_deletion_request
-      subject: ""
+    - type: form
+      url: https://www.locatefamily.com/optout.html
+      steps:
+        - action: goto
+          url: https://www.locatefamily.com/optout.html
+        - action: screenshot
+          name: locatefamily_optout
   verification:
     type: check_listing
     check_url: https://www.locatefamily.com
     expected_days: 14
   reappearance:
     frequency_days: 90
-notes: "Email-only removal process. Low priority due to limited traffic."
+notes: "Email privacy@locatefamily.com bounced (554 Access denied, confirmed 2026-02-21). Manual opt-out via website."

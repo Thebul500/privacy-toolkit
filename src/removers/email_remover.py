@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 import datetime as dt
+import email as email_lib
 import html
+import imaplib
 import logging
 import re
 import smtplib
@@ -19,6 +21,9 @@ from jinja2.sandbox import SandboxedEnvironment
 from src.config import TEMPLATES_DIR, SmtpConfig
 from src.db import Database
 from src.models import Broker, Profile
+
+# SMTP error codes indicating permanent recipient failure
+PERMANENT_FAILURE_CODES = {550, 551, 552, 553, 554}
 
 
 def _html_to_plain(html_body: str) -> str:
@@ -104,7 +109,11 @@ class EmailRemover:
                     from_addr: str = "", from_name: str = "",
                     reply_to: str = "", message_id: str = "",
                     extra_headers: dict[str, str] | None = None) -> str:
-        """Open an SMTP connection, send the message, and return the message_id."""
+        """Open an SMTP connection, send the message, and return the message_id.
+
+        Raises ``smtplib.SMTPRecipientsRefused`` if the server immediately
+        rejects the recipient address (permanent failure).
+        """
         from_addr = from_addr or self.smtp.from_email or self.smtp.username
         reply_to = reply_to or from_addr
         plain_body = _html_to_plain(html_body)
@@ -126,7 +135,13 @@ class EmailRemover:
             if self.smtp.use_tls:
                 server.starttls()
             server.login(self.smtp.username, self.smtp.password)
-            server.send_message(msg)
+            refused = server.send_message(msg)
+
+        if refused:
+            for addr, (code, _msg) in refused.items():
+                logger.warning("SMTP refused recipient %s: %s %s", addr, code, _msg)
+                if code in PERMANENT_FAILURE_CODES:
+                    raise smtplib.SMTPRecipientsRefused(refused)
 
         return message_id
 
@@ -206,6 +221,15 @@ class EmailRemover:
 
             # Rate limit
             time.sleep(self.smtp.delay_seconds)
+
+        except smtplib.SMTPRecipientsRefused as e:
+            logger.error("Recipient bounced for broker=%s to=%s: %s", broker.slug, method.address, e)
+            result["success"] = False
+            result["error"] = f"Address bounced: {method.address}"
+            result["bounced"] = True
+            self.db.log("email_bounced", profile.name, {
+                "broker": broker.slug, "to": method.address, "error": str(e),
+            }, success=False)
 
         except Exception as e:
             logger.error("SMTP send failed for broker=%s to=%s: %s", broker.slug, method.address, e)
@@ -292,3 +316,141 @@ class EmailRemover:
                 "broker": broker.slug, "error": str(e),
             }, success=False)
             return {"success": False, "error": str(e)}
+
+    def check_bounces(self, imap_host: str = "imap.gmail.com") -> list[dict]:
+        """Check Gmail IMAP for bounce-back messages and update removal records.
+
+        Connects to IMAP using the same credentials as SMTP, searches for
+        delivery failure notifications from mailer-daemon, extracts the
+        bounced recipient addresses, and marks matching removal_requests
+        as rejected.
+
+        Returns a list of dicts with bounce details.
+        """
+        if not self.smtp.username or not self.smtp.password:
+            logger.warning("SMTP credentials not configured, cannot check bounces")
+            return []
+
+        bounces: list[dict] = []
+
+        try:
+            mail = imaplib.IMAP4_SSL(imap_host)
+            mail.login(self.smtp.username, self.smtp.password)
+            mail.select("INBOX")
+
+            # Search for delivery failure messages
+            status, msg_ids = mail.search(
+                None,
+                '(OR (FROM "mailer-daemon") (FROM "postmaster"))',
+            )
+            if status != "OK" or not msg_ids[0]:
+                mail.logout()
+                return []
+
+            for mid in msg_ids[0].split():
+                try:
+                    status, data = mail.fetch(mid, "(RFC822)")
+                    if status != "OK":
+                        continue
+                    msg = email_lib.message_from_bytes(data[0][1])
+
+                    # Extract bounced address from body
+                    body = ""
+                    if msg.is_multipart():
+                        for part in msg.walk():
+                            if part.get_content_type() == "text/plain":
+                                payload = part.get_payload(decode=True)
+                                if payload:
+                                    body = payload.decode("utf-8", errors="replace")
+                                break
+                    else:
+                        payload = msg.get_payload(decode=True)
+                        if payload:
+                            body = payload.decode("utf-8", errors="replace")
+
+                    # Find the bounced email address in the body
+                    addr_match = re.search(
+                        r"wasn't delivered to\s+(\S+@\S+)", body
+                    )
+                    if not addr_match:
+                        # Try alternative bounce format
+                        addr_match = re.search(
+                            r"<(\S+@\S+)>.*(?:rejected|unknown|not found|does not exist)",
+                            body,
+                            re.IGNORECASE | re.DOTALL,
+                        )
+                    if not addr_match:
+                        continue
+
+                    bounced_addr = addr_match.group(1).strip("<>").lower()
+                    bounce_date = msg.get("Date", "")
+
+                    # Extract SMTP error code
+                    error_match = re.search(r"(\d{3}\s+\d\.\d\.\d\s+\S.*)", body)
+                    error_detail = error_match.group(1).strip() if error_match else "delivery failed"
+
+                    bounces.append({
+                        "address": bounced_addr,
+                        "date": bounce_date,
+                        "error": error_detail,
+                    })
+
+                except Exception as e:
+                    logger.debug("Failed to parse bounce message %s: %s", mid, e)
+
+            mail.logout()
+
+        except imaplib.IMAP4.error as e:
+            logger.error("IMAP connection failed: %s", e)
+            return []
+        except Exception as e:
+            logger.error("Bounce check failed: %s", e)
+            return []
+
+        # Deduplicate by address
+        seen = set()
+        unique_bounces = []
+        for b in bounces:
+            if b["address"] not in seen:
+                seen.add(b["address"])
+                unique_bounces.append(b)
+
+        # Cross-reference with removal_requests and mark as rejected
+        updated = 0
+        removals = self.db.get_removals(status="submitted")
+        bounced_addrs = {b["address"] for b in unique_bounces}
+        bounce_errors = {b["address"]: b["error"] for b in unique_bounces}
+
+        from src.config import load_all_brokers
+        broker_emails: dict[str, str] = {}
+        for broker in load_all_brokers():
+            method = broker.email_method
+            if method:
+                broker_emails[broker.slug] = method.address.lower()
+
+        for removal in removals:
+            broker_slug = removal.get("broker_slug", "")
+            broker_addr = broker_emails.get(broker_slug, "").lower()
+            if broker_addr and broker_addr in bounced_addrs:
+                try:
+                    error = bounce_errors.get(broker_addr, "address bounced")
+                    notes = removal.get("notes") or ""
+                    bounce_note = f"bounced:{time.strftime('%Y-%m-%d')} {error}"
+                    new_notes = f"{notes}; {bounce_note}" if notes else bounce_note
+                    self.db.update_removal_status(
+                        removal["id"], "rejected", notes=new_notes,
+                    )
+                    self.db.log("email_bounced", removal.get("profile"), {
+                        "broker": broker_slug, "address": broker_addr,
+                        "error": error, "removal_id": removal["id"],
+                    }, success=False)
+                    updated += 1
+                except ValueError:
+                    # Already transitioned or invalid state
+                    pass
+
+        logger.info(
+            "Bounce check complete: %d bounced addresses found, %d removals updated",
+            len(unique_bounces), updated,
+        )
+        return unique_bounces

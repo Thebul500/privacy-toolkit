@@ -12,10 +12,6 @@ data_types:
   - purchase_history
 opt_out:
   methods:
-    - type: email
-      address: privacy-inquiries_us@oracle.com
-      template: ccpa_deletion_request
-      subject: ""
     - type: form
       url: https://www.oracle.com/legal/privacy/advertising-privacy-policy.html
       steps:
@@ -40,4 +36,4 @@ opt_out:
     expected_days: 30
   reappearance:
     frequency_days: 180
-notes: "Major marketing data broker. Opt-out section located in advertising privacy policy."
+notes: "Major marketing data broker. Email privacy-inquiries_us@oracle.com bounced (550 Unknown recipient, confirmed 2026-02-21). Use form opt-out via advertising privacy policy."
