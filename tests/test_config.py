@@ -14,6 +14,7 @@ from src.config import (
     load_broker,
     load_profile,
     validate_broker,
+    validate_safe_name,
 )
 
 
@@ -303,3 +304,43 @@ class TestValidateBroker:
             assert errors == [], (
                 f"Broker {path.name} has validation errors: {errors}"
             )
+
+
+class TestPathTraversalPrevention:
+    """Test that path traversal attacks are blocked."""
+
+    def test_dotdot_rejected(self, tmp_path):
+        with pytest.raises(ValueError, match="illegal characters"):
+            validate_safe_name("../etc/passwd", tmp_path, "test")
+
+    def test_forward_slash_rejected(self, tmp_path):
+        with pytest.raises(ValueError, match="illegal characters"):
+            validate_safe_name("foo/bar", tmp_path, "test")
+
+    def test_backslash_rejected(self, tmp_path):
+        with pytest.raises(ValueError, match="illegal characters"):
+            validate_safe_name("foo\\bar", tmp_path, "test")
+
+    def test_null_byte_rejected(self, tmp_path):
+        with pytest.raises(ValueError, match="null bytes"):
+            validate_safe_name("foo\x00bar", tmp_path, "test")
+
+    def test_empty_name_rejected(self, tmp_path):
+        with pytest.raises(ValueError, match="empty"):
+            validate_safe_name("", tmp_path, "test")
+
+    def test_whitespace_only_rejected(self, tmp_path):
+        with pytest.raises(ValueError, match="empty"):
+            validate_safe_name("   ", tmp_path, "test")
+
+    def test_valid_name_returns_path(self, tmp_path):
+        result = validate_safe_name("my-profile", tmp_path, "test")
+        assert result == (tmp_path / "my-profile.yaml").resolve()
+
+    def test_load_profile_traversal(self):
+        with pytest.raises(ValueError):
+            load_profile("../../etc/passwd")
+
+    def test_load_broker_traversal(self):
+        with pytest.raises(ValueError):
+            load_broker("../../etc/passwd")

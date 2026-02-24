@@ -3,6 +3,7 @@
 from __future__ import annotations
 import logging
 import os
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
@@ -20,6 +21,30 @@ BROKERS_DIR = TOOLKIT_DIR / "brokers"
 TEMPLATES_DIR = TOOLKIT_DIR / "templates"
 DATA_DIR = TOOLKIT_DIR / "data"
 BIN_DIR = TOOLKIT_DIR / "bin"
+
+
+def validate_safe_name(name: str, base_dir: Path, label: str = "name") -> Path:
+    """Validate that *name* is a safe filename and return the resolved path.
+
+    Rejects names containing path-traversal sequences (``..``, ``/``, ``\\``),
+    null bytes, or empty strings.  As a belt-and-suspenders check the resolved
+    path must remain inside *base_dir*.
+
+    Returns ``base_dir / f"{name}.yaml"`` (resolved).
+
+    Raises:
+        ValueError: if the name is unsafe.
+    """
+    if not name or not name.strip():
+        raise ValueError(f"Invalid {label}: name must not be empty")
+    if "\x00" in name:
+        raise ValueError(f"Invalid {label}: name contains null bytes")
+    if re.search(r'[/\\]', name) or '..' in name:
+        raise ValueError(f"Invalid {label}: name contains illegal characters")
+    path = (base_dir / f"{name}.yaml").resolve()
+    if not path.is_relative_to(base_dir.resolve()):
+        raise ValueError(f"Invalid {label}: path escapes base directory")
+    return path
 
 
 def _resolve_env(value: str, env_name: str) -> str:
@@ -146,9 +171,9 @@ class Config:
 
 
 def load_profile(name: str) -> Profile:
-    path = PROFILES_DIR / f"{name}.yaml"
+    path = validate_safe_name(name, PROFILES_DIR, "profile")
     if not path.exists():
-        raise FileNotFoundError(f"Profile not found: {path}")
+        raise FileNotFoundError(f"Profile not found: {name}")
     return Profile.from_yaml(path)
 
 
@@ -236,9 +261,9 @@ def validate_broker(data: dict, filename: str) -> list[str]:
 
 
 def load_broker(slug: str) -> Broker:
-    path = BROKERS_DIR / f"{slug}.yaml"
+    path = validate_safe_name(slug, BROKERS_DIR, "broker")
     if not path.exists():
-        raise FileNotFoundError(f"Broker not found: {path}")
+        raise FileNotFoundError(f"Broker not found: {slug}")
     with open(path) as f:
         data = yaml.safe_load(f) or {}
     errors = validate_broker(data, path.name)

@@ -13,7 +13,8 @@ from email.mime.text import MIMEText
 
 logger = logging.getLogger(__name__)
 
-from jinja2 import Environment, FileSystemLoader
+from jinja2 import FileSystemLoader, select_autoescape
+from jinja2.sandbox import SandboxedEnvironment
 
 from src.config import TEMPLATES_DIR, SmtpConfig
 from src.db import Database
@@ -38,7 +39,10 @@ class EmailRemover:
     def __init__(self, smtp_config: SmtpConfig, db: Database):
         self.smtp = smtp_config
         self.db = db
-        self.env = Environment(loader=FileSystemLoader(str(TEMPLATES_DIR)))
+        self.env = SandboxedEnvironment(
+            loader=FileSystemLoader(str(TEMPLATES_DIR)),
+            autoescape=select_autoescape(default=True, default_for_string=True),
+        )
 
     def _gather_evidence(self, broker: Broker, profile: Profile) -> dict:
         """Look up scan findings for this broker to include in the email."""

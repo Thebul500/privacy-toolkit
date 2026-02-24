@@ -3,6 +3,7 @@
 from __future__ import annotations
 import json
 import logging
+import re
 import subprocess
 import sys
 import tempfile
@@ -31,7 +32,8 @@ class SherlockScanner(BaseScanner):
 
     def scan(self, query: str, query_type: str = "username") -> list[ScanResult]:
         with tempfile.TemporaryDirectory() as tmpdir:
-            output_file = Path(tmpdir) / f"{query}.json"
+            safe_query = re.sub(r'[^a-zA-Z0-9_-]', '_', query)
+            output_file = Path(tmpdir) / f"{safe_query}.json"
             cmd = [
                 sys.executable, "-m", "sherlock_project",
                 query,

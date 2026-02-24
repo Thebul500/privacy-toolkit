@@ -255,3 +255,22 @@ class TestNoFormMethod:
 
         assert result["success"] is False
         assert "error" in result
+
+
+class TestEmailRemoverSandbox:
+    """Test that EmailRemover uses SandboxedEnvironment with autoescape."""
+
+    def test_sandboxed_environment(self, tmp_db, sample_config):
+        from jinja2.sandbox import SandboxedEnvironment
+        from src.removers.email_remover import EmailRemover
+
+        remover = EmailRemover(sample_config.smtp, tmp_db)
+        assert isinstance(remover.env, SandboxedEnvironment)
+
+    def test_autoescape_enabled(self, tmp_db, sample_config):
+        from src.removers.email_remover import EmailRemover
+
+        remover = EmailRemover(sample_config.smtp, tmp_db)
+        # select_autoescape returns a callable; verify it enables escaping for HTML
+        assert callable(remover.env.autoescape)
+        assert remover.env.autoescape("test.html") is True

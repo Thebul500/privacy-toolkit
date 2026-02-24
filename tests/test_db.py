@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 
 class TestCreateScan:
     """Test scan creation and retrieval."""
@@ -239,6 +241,64 @@ class TestUpdateRemovalStatus:
         removals = tmp_db.get_removals(profile="user1")
         assert removals[0]["email_message_id"] == "<abc123@privacy-toolkit>"
         assert removals[0]["notes"] == "Sent via test"
+
+
+class TestStateTransitionValidation:
+    """Test that invalid status transitions are rejected."""
+
+    def test_pending_to_confirmed_rejected(self, tmp_db):
+        """Cannot go directly from pending to confirmed."""
+        rid = tmp_db.create_removal("user1", "broker1", "Broker", "email")
+        with pytest.raises(ValueError, match="Invalid status transition"):
+            tmp_db.update_removal_status(rid, "confirmed")
+
+    def test_pending_to_reappeared_rejected(self, tmp_db):
+        """Cannot go directly from pending to reappeared."""
+        rid = tmp_db.create_removal("user1", "broker1", "Broker", "email")
+        with pytest.raises(ValueError, match="Invalid status transition"):
+            tmp_db.update_removal_status(rid, "reappeared")
+
+    def test_submitted_to_reappeared_rejected(self, tmp_db):
+        """Cannot go directly from submitted to reappeared."""
+        rid = tmp_db.create_removal("user1", "broker1", "Broker", "email")
+        tmp_db.update_removal_status(rid, "submitted")
+        with pytest.raises(ValueError, match="Invalid status transition"):
+            tmp_db.update_removal_status(rid, "reappeared")
+
+    def test_valid_full_lifecycle(self, tmp_db):
+        """Full valid lifecycle: pending -> submitted -> confirmed -> reappeared."""
+        rid = tmp_db.create_removal("user1", "broker1", "Broker", "email")
+        tmp_db.update_removal_status(rid, "submitted")
+        tmp_db.update_removal_status(rid, "confirmed")
+        tmp_db.update_removal_status(rid, "reappeared")
+        removals = tmp_db.get_removals(profile="user1")
+        assert removals[0]["status"] == "reappeared"
+
+    def test_nonexistent_removal_raises(self, tmp_db):
+        """Updating a non-existent removal should raise ValueError."""
+        with pytest.raises(ValueError, match="not found"):
+            tmp_db.update_removal_status(99999, "submitted")
+
+    def test_pending_captcha_to_pending_valid(self, tmp_db):
+        """pending_captcha -> pending is a valid transition."""
+        rid = tmp_db.create_removal("user1", "broker1", "Broker", "email")
+        # Manually set to pending_captcha
+        conn = tmp_db._connect()
+        conn.execute("UPDATE removal_requests SET status='pending_captcha' WHERE id=?", (rid,))
+        conn.commit()
+        conn.close()
+        tmp_db.update_removal_status(rid, "pending")
+        removals = tmp_db.get_removals(profile="user1")
+        assert removals[0]["status"] == "pending"
+
+    def test_rejected_to_submitted_valid(self, tmp_db):
+        """rejected -> submitted is a valid transition."""
+        rid = tmp_db.create_removal("user1", "broker1", "Broker", "email")
+        tmp_db.update_removal_status(rid, "submitted")
+        tmp_db.update_removal_status(rid, "rejected")
+        tmp_db.update_removal_status(rid, "submitted")
+        removals = tmp_db.get_removals(profile="user1")
+        assert removals[0]["status"] == "submitted"
 
 
 class TestAuditLog:

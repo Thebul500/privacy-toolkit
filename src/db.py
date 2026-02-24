@@ -75,6 +75,16 @@ CREATE INDEX IF NOT EXISTS idx_scans_profile ON scans(profile);
 """
 
 
+VALID_TRANSITIONS: dict[str, set[str]] = {
+    "pending": {"submitted", "pending_captcha"},
+    "submitted": {"confirmed", "rejected", "submitted"},
+    "confirmed": {"reappeared"},
+    "rejected": {"pending", "submitted"},
+    "reappeared": {"pending", "submitted"},
+    "pending_captcha": {"pending", "submitted"},
+}
+
+
 class Database:
     def __init__(self, db_path: Optional[str] = None):
         if db_path is None:
@@ -257,6 +267,20 @@ class Database:
 
     def update_removal_status(self, removal_id: int, status: str, **kwargs: Any) -> None:
         conn = self._connect()
+        row = conn.execute(
+            "SELECT status FROM removal_requests WHERE id=?", (removal_id,)
+        ).fetchone()
+        if row is None:
+            conn.close()
+            raise ValueError(f"Removal request {removal_id} not found")
+        current = row["status"]
+        allowed = VALID_TRANSITIONS.get(current, set())
+        if status not in allowed:
+            conn.close()
+            raise ValueError(
+                f"Invalid status transition: {current} -> {status} "
+                f"(allowed: {sorted(allowed)})"
+            )
         sets = ["status=?", "updated_at=?"]
         params: list[Any] = [status, _now()]
         if status == "submitted":
