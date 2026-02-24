@@ -205,11 +205,11 @@ The web UI runs on port 8080 (or 8384 via Docker) and provides:
 
 Setup:
 1. Create a GitHub OAuth App: **Settings > Developer Settings > OAuth Apps > New**
-   - Homepage URL: `https://privacy.bul-network.com`
-   - Callback URL: `https://privacy.bul-network.com/oauth2/callback`
+   - Homepage URL: `https://privacy.example.com`
+   - Callback URL: `https://privacy.example.com/oauth2/callback`
 2. Copy credentials to `.env` (see `.env.example`)
 3. Generate cookie secret: `python3 -c 'import secrets; print(secrets.token_urlsafe(32))'`
-4. Update Nginx Proxy Manager: forward `privacy.bul-network.com` to `oauth2-proxy:4180` instead of `privacy-toolkit:8384`
+4. Update Nginx Proxy Manager: forward `privacy.example.com` to `oauth2-proxy:4180` instead of `privacy-toolkit:8384`
 5. Remove any existing basic auth access lists
 
 **API Key** (optional) — set `PRIVACY_TOOLKIT_API_KEY` env var to require `X-API-Key` header on all requests. The `/api/health` endpoint is always public.
@@ -337,7 +337,7 @@ privacy-toolkit/
 ├── config/                    # Configuration files
 ├── tests/                     # 177 pytest tests
 ├── data/                      # SQLite DB, logs, screenshots
-├── bin/                       # PhoneInfoga binary
+├── bin/                       # PhoneInfoga binary (not included, see install.sh)
 ├── .github/workflows/
 │   ├── ci.yml               # CI: lint, test, SAST (Semgrep + Bandit)
 │   ├── security.yml         # Weekly scheduled security scan

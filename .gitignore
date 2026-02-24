@@ -29,3 +29,10 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Binaries
+bin/
+
+# Claude Code
+CLAUDE.md
+.claude/
