@@ -240,11 +240,101 @@ class TestAccountsSearch:
 # ---------------------------------------------------------------------------
 
 
+def _make_mock_broker(slug="broker-a", name="Broker A", priority="critical", has_email=True, has_form=False):
+    """Create a mock Broker with the fields the template needs."""
+    from unittest.mock import MagicMock
+    from src.models import Priority, OptOutMethodType
+
+    b = MagicMock()
+    b.slug = slug
+    b.name = name
+    b.priority = Priority(priority)
+
+    email_method = MagicMock()
+    email_method.type = OptOutMethodType.EMAIL
+    form_method = MagicMock()
+    form_method.type = OptOutMethodType.FORM
+
+    methods = []
+    if has_email:
+        methods.append(email_method)
+        b.email_method = email_method
+    else:
+        b.email_method = None
+    if has_form:
+        methods.append(form_method)
+        b.form_method = form_method
+    else:
+        b.form_method = None
+    b.methods = methods
+    return b
+
+
 class TestRemovalsPage:
     def test_get_removals(self, app_client):
         resp = app_client.get("/removals")
         assert resp.status_code == 200
         assert "Removal" in resp.text
+
+    def test_get_removals_shows_broker_checkboxes(self, app_client):
+        broker = _make_mock_broker(slug="spokeo", name="Spokeo", priority="critical")
+        app_module = app_client._app_module
+        with patch.object(app_module, "load_all_brokers", return_value=[broker]):
+            resp = app_client.get("/removals")
+        assert resp.status_code == 200
+        assert "spokeo" in resp.text
+        assert "Spokeo" in resp.text
+        assert 'name="brokers"' in resp.text
+        assert "critical" in resp.text
+
+
+class TestEmailRemovalsSelection:
+    def test_email_removals_selected_brokers(self, app_client):
+        """POST with specific brokers should only queue those slugs."""
+        broker_a = _make_mock_broker(slug="broker-a", name="Broker A")
+        broker_b = _make_mock_broker(slug="broker-b", name="Broker B")
+        app_module = app_client._app_module
+        with patch.object(app_module, "load_all_brokers", return_value=[broker_a, broker_b]):
+            resp = _csrf_post(
+                app_client, "/removals/email",
+                data={"profile": "alice", "brokers": "broker-a"},
+                follow_redirects=False,
+            )
+        assert resp.status_code == 303
+        # task_manager.submit(name, func, profile, broker_slugs, config, db, ...)
+        call_args = app_client._mock_tm.submit.call_args
+        submitted_slugs = call_args[0][3]  # fourth positional arg = broker_slugs
+        assert submitted_slugs == ["broker-a"]
+
+    def test_email_removals_no_selection_sends_all(self, app_client):
+        """POST without brokers field should send to all email brokers."""
+        broker_a = _make_mock_broker(slug="broker-a", name="Broker A")
+        broker_b = _make_mock_broker(slug="broker-b", name="Broker B")
+        app_module = app_client._app_module
+        with patch.object(app_module, "load_all_brokers", return_value=[broker_a, broker_b]):
+            resp = _csrf_post(
+                app_client, "/removals/email",
+                data={"profile": "alice"},
+                follow_redirects=False,
+            )
+        assert resp.status_code == 303
+        call_args = app_client._mock_tm.submit.call_args
+        submitted_slugs = call_args[0][3]  # fourth positional arg = broker_slugs
+        assert set(submitted_slugs) == {"broker-a", "broker-b"}
+
+    def test_email_removals_invalid_slug_filtered(self, app_client):
+        """POST with only invalid slugs should redirect with error."""
+        broker_a = _make_mock_broker(slug="broker-a", name="Broker A")
+        app_module = app_client._app_module
+        with patch.object(app_module, "load_all_brokers", return_value=[broker_a]):
+            resp = _csrf_post(
+                app_client, "/removals/email",
+                data={"profile": "alice", "brokers": "nonexistent"},
+                follow_redirects=False,
+            )
+        assert resp.status_code == 303
+        loc = resp.headers.get("location", "")
+        assert "No+valid" in loc or "error" in loc
 
 
 # ---------------------------------------------------------------------------

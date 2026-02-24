@@ -13,21 +13,92 @@
 {% if profiles %}
 <div class="card mb-6 p-5">
     <h3 class="text-sm font-semibold text-white mb-3">Send Email Removal Requests</h3>
-    <form method="post" action="/removals/email" class="flex items-end gap-3">
+    <form id="email-removal-form" method="post" action="/removals/email">
         <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
-        <div>
+        <div class="mb-4">
             <label class="block text-xs font-medium text-dark-300 mb-1.5">Profile</label>
-            <select name="profile" class="bg-dark-800 border border-dark-500 rounded px-3 py-1.5 text-sm text-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 focus:outline-none">
+            <select name="profile" id="email-profile-select" class="bg-dark-800 border border-dark-500 rounded px-3 py-1.5 text-sm text-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 focus:outline-none">
                 {% for p in profiles %}
                 <option value="{{ p }}">{{ p }}</option>
                 {% endfor %}
             </select>
         </div>
-        <button type="submit" class="btn-warning">
-            Send to All Brokers
-        </button>
+
+        {% if email_brokers %}
+        <div class="flex items-center justify-between mb-3">
+            <div class="flex items-center gap-3">
+                <span class="text-xs text-dark-300">Select brokers:</span>
+                <button type="button" onclick="selectAll('email')" class="text-xs text-blue-400 hover:text-blue-300">Select All</button>
+                <button type="button" onclick="deselectAll('email')" class="text-xs text-dark-400 hover:text-dark-300">Deselect All</button>
+            </div>
+            <span id="email-count" class="text-xs text-dark-400">0 selected</span>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 mb-4">
+            {% for b in email_brokers %}
+            <label class="flex items-center gap-2 p-2 rounded bg-dark-800 hover:bg-dark-700 cursor-pointer border border-dark-600 hover:border-dark-500 transition-colors">
+                <input type="checkbox" name="brokers" value="{{ b.slug }}" onchange="updateCount('email')"
+                       class="rounded bg-dark-700 border-dark-500 text-blue-500 focus:ring-blue-500/30">
+                <div class="flex-1 min-w-0">
+                    <span class="text-sm text-white truncate block">{{ b.name }}</span>
+                    <span class="text-xs text-dark-400 truncate block">{{ b.slug }}</span>
+                </div>
+                {% if b.priority.value == 'critical' %}
+                <span class="text-xs px-1.5 py-0.5 rounded bg-red-900/50 text-red-300 shrink-0">critical</span>
+                {% elif b.priority.value == 'high' %}
+                <span class="text-xs px-1.5 py-0.5 rounded bg-orange-900/50 text-orange-300 shrink-0">high</span>
+                {% elif b.priority.value == 'medium' %}
+                <span class="text-xs px-1.5 py-0.5 rounded bg-yellow-900/50 text-yellow-300 shrink-0">medium</span>
+                {% else %}
+                <span class="text-xs px-1.5 py-0.5 rounded bg-dark-600 text-dark-300 shrink-0">low</span>
+                {% endif %}
+            </label>
+            {% endfor %}
+        </div>
+        <div class="flex items-center gap-3">
+            <button type="submit" id="email-submit-btn" class="btn-warning" disabled>
+                Send to Selected
+            </button>
+            <button type="button" onclick="selectAllAndSubmit()" class="btn-primary">
+                Send to All
+            </button>
+        </div>
+        {% else %}
+        <p class="text-sm text-dark-400">No brokers with email opt-out configured.</p>
+        {% endif %}
     </form>
 </div>
+
+<!-- Form Broker Removals -->
+{% if form_brokers %}
+<div class="card mb-6 p-5">
+    <h3 class="text-sm font-semibold text-white mb-3">Form-Based Removals</h3>
+    <p class="text-xs text-dark-400 mb-3">Browser automation — one broker at a time.</p>
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+        {% for b in form_brokers %}
+        <div class="flex items-center justify-between p-2 rounded bg-dark-800 border border-dark-600">
+            <div class="min-w-0">
+                <span class="text-sm text-white truncate block">{{ b.name }}</span>
+                {% if b.priority.value == 'critical' %}
+                <span class="text-xs px-1.5 py-0.5 rounded bg-red-900/50 text-red-300">critical</span>
+                {% elif b.priority.value == 'high' %}
+                <span class="text-xs px-1.5 py-0.5 rounded bg-orange-900/50 text-orange-300">high</span>
+                {% elif b.priority.value == 'medium' %}
+                <span class="text-xs px-1.5 py-0.5 rounded bg-yellow-900/50 text-yellow-300">medium</span>
+                {% else %}
+                <span class="text-xs px-1.5 py-0.5 rounded bg-dark-600 text-dark-300">low</span>
+                {% endif %}
+            </div>
+            <form method="post" action="/removals/form" class="shrink-0 ml-2">
+                <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+                <input type="hidden" name="profile" class="form-broker-profile" value="{{ profiles[0] if profiles else '' }}">
+                <input type="hidden" name="broker" value="{{ b.slug }}">
+                <button type="submit" class="btn-primary text-xs px-2 py-1">Run</button>
+            </form>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
 {% endif %}
 
 <!-- Status Filter -->
@@ -110,4 +181,41 @@
     </div>
     {% endif %}
 </div>
+
+<script>
+function updateCount(type) {
+    const checks = document.querySelectorAll('#' + type + '-removal-form input[name="brokers"]');
+    const count = Array.from(checks).filter(c => c.checked).length;
+    const label = document.getElementById(type + '-count');
+    const btn = document.getElementById(type + '-submit-btn');
+    if (label) label.textContent = count + ' selected';
+    if (btn) btn.disabled = count === 0;
+}
+
+function selectAll(type) {
+    document.querySelectorAll('#' + type + '-removal-form input[name="brokers"]').forEach(c => c.checked = true);
+    updateCount(type);
+}
+
+function deselectAll(type) {
+    document.querySelectorAll('#' + type + '-removal-form input[name="brokers"]').forEach(c => c.checked = false);
+    updateCount(type);
+}
+
+function selectAllAndSubmit() {
+    selectAll('email');
+    document.getElementById('email-removal-form').submit();
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    var profileSelect = document.getElementById('email-profile-select');
+    if (profileSelect) {
+        profileSelect.addEventListener('change', function() {
+            document.querySelectorAll('.form-broker-profile').forEach(function(input) {
+                input.value = profileSelect.value;
+            });
+        });
+    }
+});
+</script>
 {% endblock %}

@@ -968,10 +968,11 @@ def remove():
 
 
 @remove.command("email-request")
-@click.option("--broker", "-b", default=None, help="Broker slug or 'all'")
+@click.option("--broker", "-b", "broker_input", multiple=True,
+              help="Broker slug(s). Repeat or comma-separate: -b a,b -b c. Default: all")
 @click.option("--dry-run", is_flag=True, help="Preview without sending")
 @click.pass_context
-def remove_email(ctx, broker, dry_run):
+def remove_email(ctx, broker_input, dry_run):
     """Send CCPA/GDPR deletion emails to data brokers."""
     profile_name = ctx.obj["profile_name"]
     if not profile_name:
@@ -994,15 +995,28 @@ def remove_email(ctx, broker, dry_run):
     from src.removers.email_remover import EmailRemover
     remover = EmailRemover(config.smtp, db)
 
-    if broker and broker != "all":
-        brokers = []
-        try:
-            brokers.append(load_broker(broker))
-        except FileNotFoundError:
-            console.print(f"[red]Broker '{broker}' not found.[/red]")
-            return
-    else:
+    # Parse broker slugs: split each input by comma, flatten
+    slugs = []
+    for item in broker_input:
+        for part in item.split(","):
+            part = part.strip()
+            if part:
+                slugs.append(part)
+
+    if not slugs or slugs == ["all"]:
         brokers = [b for b in load_all_brokers() if b.email_method]
+    else:
+        brokers = []
+        for slug in slugs:
+            try:
+                b = load_broker(slug)
+            except FileNotFoundError:
+                console.print(f"[yellow]Broker '{slug}' not found, skipping.[/yellow]")
+                continue
+            if not b.email_method:
+                console.print(f"[yellow]Broker '{slug}' has no email method, skipping.[/yellow]")
+                continue
+            brokers.append(b)
 
     if not brokers:
         console.print("[yellow]No brokers with email opt-out found.[/yellow]")

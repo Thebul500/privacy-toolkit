@@ -517,6 +517,12 @@ async def removals_page(request: Request, status: Optional[str] = None,
                         message: Optional[str] = None, message_type: Optional[str] = None):
     removals = db.get_removals(status=status)
 
+    all_brokers = load_all_brokers()
+    priority_order = {"critical": 0, "high": 1, "medium": 2, "low": 3}
+    all_brokers.sort(key=lambda b: priority_order.get(b.priority.value, 4))
+    email_brokers = [b for b in all_brokers if b.email_method]
+    form_brokers = [b for b in all_brokers if b.form_method]
+
     return templates.TemplateResponse("removals.html", _ctx(
         request,
         active="removals",
@@ -525,18 +531,33 @@ async def removals_page(request: Request, status: Optional[str] = None,
         filter_status=status,
         message=message,
         message_type=message_type,
+        email_brokers=email_brokers,
+        form_brokers=form_brokers,
     ))
 
 
 @app.post("/removals/email")
-async def trigger_email_removals(profile: str = Form(...)):
+async def trigger_email_removals(request: Request, profile: str = Form(...)):
     try:
         load_profile(profile)
     except FileNotFoundError:
         return RedirectResponse("/removals", status_code=303)
 
-    brokers = load_all_brokers()
-    email_slugs = [b.slug for b in brokers if b.email_method]
+    form_data = await request.form()
+    selected = form_data.getlist("brokers")
+
+    all_brokers = load_all_brokers()
+    valid_email_slugs = {b.slug for b in all_brokers if b.email_method}
+
+    if selected:
+        email_slugs = [s for s in selected if s in valid_email_slugs]
+        if not email_slugs:
+            return RedirectResponse(
+                "/removals?message=No+valid+email+brokers+selected&message_type=error",
+                status_code=303,
+            )
+    else:
+        email_slugs = [b.slug for b in all_brokers if b.email_method]
 
     if not email_slugs:
         return RedirectResponse("/removals?message=No+brokers+with+email+opt-out+found&message_type=error",
