@@ -101,6 +101,7 @@ class EmailRemover:
             "listing_urls": evidence["listing_urls"],
             "data_types_found": evidence["data_types_found"],
             "privacy_policy_url": evidence["privacy_policy_url"],
+            "region": profile.region,
             "jurisdiction": profile.jurisdiction,
             "applicable_laws": profile.applicable_laws,
         }

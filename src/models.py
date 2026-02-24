@@ -65,7 +65,8 @@ class Profile:
     usernames: list[str] = field(default_factory=list)
     addresses: list[Address] = field(default_factory=list)
     date_of_birth: str = ""
-    jurisdiction: str = "US"
+    region: str = "US"  # "US" or "EU"
+    jurisdiction: str = "US"  # US state code (IL, CA) or EU country code (DE, FR)
     applicable_laws: list[str] = field(default_factory=lambda: ["CCPA"])
 
     @property
@@ -104,6 +105,7 @@ class Profile:
             usernames=idents.get("usernames", []),
             addresses=addresses,
             date_of_birth=idents.get("date_of_birth", ""),
+            region=data.get("legal", {}).get("region", "US"),
             jurisdiction=data.get("legal", {}).get("jurisdiction", "US"),
             applicable_laws=data.get("legal", {}).get("applicable_laws", ["CCPA"]),
         )
@@ -126,6 +128,7 @@ class Profile:
                 "date_of_birth": self.date_of_birth,
             },
             "legal": {
+                "region": self.region,
                 "jurisdiction": self.jurisdiction,
                 "applicable_laws": self.applicable_laws,
             },

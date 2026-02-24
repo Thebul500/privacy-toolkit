@@ -1541,11 +1541,29 @@ def profile_create(name):
         "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "RI", "SC",
         "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY", "DC",
     }
-    state = click.prompt("State of residence (2-letter code, e.g. IL, CA, TX)", default="US")
-    state = state.upper().strip()
-    if state not in US_STATES and state != "US":
-        console.print(f"[yellow]'{state}' not recognized. Using 'US' as default.[/yellow]")
-        state = "US"
+    EU_COUNTRIES = {
+        "AT", "BE", "BG", "HR", "CY", "CZ", "DK", "EE", "FI", "FR",
+        "DE", "GR", "HU", "IE", "IT", "LV", "LT", "LU", "MT", "NL",
+        "PL", "PT", "RO", "SK", "SI", "ES", "SE",
+        "GB", "NO", "IS", "LI", "CH",  # UK/EEA/Swiss (GDPR-equivalent)
+    }
+    region = click.prompt("Region [US/EU]", default="US", type=click.Choice(["US", "EU"], case_sensitive=False))
+    region = region.upper().strip()
+
+    if region == "EU":
+        jurisdiction = click.prompt("Country code (e.g. DE, FR, IT, ES, NL, GB)", default="EU")
+        jurisdiction = jurisdiction.upper().strip()
+        if jurisdiction not in EU_COUNTRIES and jurisdiction != "EU":
+            console.print(f"[yellow]'{jurisdiction}' not recognized. Using 'EU' as default.[/yellow]")
+            jurisdiction = "EU"
+        laws = ["GDPR"]
+    else:
+        jurisdiction = click.prompt("State (2-letter code, e.g. IL, CA, TX)", default="US")
+        jurisdiction = jurisdiction.upper().strip()
+        if jurisdiction not in US_STATES and jurisdiction != "US":
+            console.print(f"[yellow]'{jurisdiction}' not recognized. Using 'US' as default.[/yellow]")
+            jurisdiction = "US"
+        laws = ["CCPA"]
 
     p = Profile(
         name=name,
@@ -1555,7 +1573,9 @@ def profile_create(name):
         email_addresses=emails,
         phone_numbers=phones,
         usernames=usernames,
-        jurisdiction=state,
+        region=region,
+        jurisdiction=jurisdiction,
+        applicable_laws=laws,
     )
     p.to_yaml(path)
     console.print(f"\n[green]Profile saved to {path}[/green]")
