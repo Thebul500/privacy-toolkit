@@ -281,20 +281,29 @@ class Database:
                 f"Invalid status transition: {current} -> {status} "
                 f"(allowed: {sorted(allowed)})"
             )
-        sets = ["status=?", "updated_at=?"]
-        params: list[Any] = [status, _now()]
+        ALLOWED_COLUMNS = frozenset({
+            "status", "updated_at", "submitted_at", "confirmed_at",
+            "email_message_id", "screenshot_path", "notes",
+        })
+        updates: dict[str, Any] = {"status": status, "updated_at": _now()}
         if status == "submitted":
-            sets.append("submitted_at=?")
-            params.append(_now())
+            updates["submitted_at"] = _now()
         if status == "confirmed":
-            sets.append("confirmed_at=?")
-            params.append(_now())
+            updates["confirmed_at"] = _now()
         for key in ("email_message_id", "screenshot_path", "notes"):
             if key in kwargs:
-                sets.append(f"{key}=?")
-                params.append(kwargs[key])
+                if key not in ALLOWED_COLUMNS:
+                    raise ValueError(f"Disallowed column: {key}")
+                updates[key] = kwargs[key]
+        cols = list(updates.keys())
+        params = [updates[c] for c in cols]
         params.append(removal_id)
-        conn.execute(f"UPDATE removal_requests SET {', '.join(sets)} WHERE id=?", params)
+        set_clause = ", ".join(f"{c}=?" for c in cols)
+        # nosemgrep: sqlalchemy-execute-raw-query — cols from ALLOWED_COLUMNS whitelist, values use ? params
+        conn.execute(
+            "UPDATE removal_requests SET " + set_clause + " WHERE id=?",  # nosec B608
+            params,
+        )
         conn.commit()
         conn.close()
 

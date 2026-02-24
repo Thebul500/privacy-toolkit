@@ -1,0 +1,8 @@
+rules: []
+
+# This file exists to document rule exclusions.
+# The project uses FastAPI + Jinja2, not Django.
+# Django-specific rules (django-no-csrf-token) are false positives —
+# all forms use a custom CSRFMiddleware with _csrf_token hidden fields.
+#
+# Excluded in CI via: --exclude-rule python.django.security.django-no-csrf-token

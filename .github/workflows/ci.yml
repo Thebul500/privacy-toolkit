@@ -148,6 +148,8 @@ jobs:
           config: >-
             p/python
             p/owasp-top-ten
+          extraArgs: >-
+            --exclude-rule python.django.security.django-no-csrf-token.django-no-csrf-token
 
       - name: Set up Python
         uses: actions/setup-python@v5

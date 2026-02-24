@@ -101,7 +101,7 @@ class BrowserConfig:
 
 @dataclass
 class WebConfig:
-    host: str = "0.0.0.0"
+    host: str = "0.0.0.0"  # nosec B104 — intended for Docker container binding
     port: int = 8080
 
 
@@ -161,7 +161,7 @@ class Config:
                 rate_limit_delay=float(browser_data.get("rate_limit_delay", 2.0)),
             ),
             web=WebConfig(
-                host=web_data.get("host", "0.0.0.0"),
+                host=web_data.get("host", "0.0.0.0"),  # nosec B104
                 port=web_data.get("port", 8080),
             ),
             db_path=data.get("database", {}).get("path", "data/privacy_toolkit.db"),

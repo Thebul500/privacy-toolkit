@@ -50,7 +50,7 @@ class HoleheScanner(BaseScanner):
         ):
             if not ispkg:
                 try:
-                    mod = importlib.import_module(modname)
+                    mod = importlib.import_module(modname)  # nosemgrep: non-literal-import — modname from pkgutil.walk_packages on holehe's own package
                     # Each module has a function with the same name as the module
                     func_name = modname.split(".")[-1]
                     if hasattr(mod, func_name):
