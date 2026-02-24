@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Optional
@@ -19,6 +20,7 @@ from src.config import (
     load_all_brokers,
     load_profile,
     list_profiles,
+    validate_safe_name,
 )
 from src.db import Database
 from src.models import Profile
@@ -62,8 +64,21 @@ async def lifespan(application: FastAPI):
 
 
 app = FastAPI(title="Privacy Toolkit", lifespan=lifespan)
+
+from src.auth import APIKeyMiddleware
+from src.csrf import CSRFMiddleware
+app.add_middleware(CSRFMiddleware)
+app.add_middleware(APIKeyMiddleware)
+
 app.mount("/static", StaticFiles(directory=str(WEB_DIR / "static")), name="static")
 templates = Jinja2Templates(directory=str(WEB_DIR / "templates"))
+
+
+def _ctx(request: Request, **kwargs) -> dict:
+    """Build a template context dict with the CSRF token injected."""
+    kwargs["request"] = request
+    kwargs["csrf_token"] = getattr(request.state, "csrf_token", "")
+    return kwargs
 
 
 # ---------------------------------------------------------------------------
@@ -98,10 +113,10 @@ async def dashboard(request: Request):
         except Exception as e:
             logger.warning("Failed to calculate privacy score for %s: %s", score_profile, e)
 
-    return templates.TemplateResponse("dashboard.html", {
-        "request": request,
-        "active": "dashboard",
-        "stats": {
+    return templates.TemplateResponse("dashboard.html", _ctx(
+        request,
+        active="dashboard",
+        stats={
             "profiles": len(profiles_list),
             "findings": findings_count,
             "removals_submitted": submitted,
@@ -109,11 +124,11 @@ async def dashboard(request: Request):
             "removal_breakdown": breakdown,
             "profile_names": profiles_list,
         },
-        "recent_activity": audit,
-        "active_tasks": active,
-        "privacy_score": privacy_score,
-        "score_profile": score_profile,
-    })
+        recent_activity=audit,
+        active_tasks=active,
+        privacy_score=privacy_score,
+        score_profile=score_profile,
+    ))
 
 
 @app.get("/profiles", response_class=HTMLResponse)
@@ -128,13 +143,13 @@ async def profiles_page(request: Request, message: Optional[str] = None,
             logger.warning("Failed to load profile %s: %s", name, e)
             loaded.append(Profile(name=name))
 
-    return templates.TemplateResponse("profiles.html", {
-        "request": request,
-        "active": "profiles",
-        "profiles": loaded,
-        "message": message,
-        "message_type": message_type,
-    })
+    return templates.TemplateResponse("profiles.html", _ctx(
+        request,
+        active="profiles",
+        profiles=loaded,
+        message=message,
+        message_type=message_type,
+    ))
 
 
 @app.post("/profiles")
@@ -147,7 +162,10 @@ async def create_profile(
     phones: str = Form(""),
     usernames: str = Form(""),
 ):
-    path = PROFILES_DIR / f"{name}.yaml"
+    try:
+        path = validate_safe_name(name, PROFILES_DIR, "profile")
+    except ValueError as e:
+        return await profiles_page(request, message=str(e), message_type="error")
     if path.exists():
         return await profiles_page(request, message=f"Profile '{name}' already exists.",
                                    message_type="error")
@@ -182,14 +200,14 @@ async def profile_detail(request: Request, name: str):
     scans = db.get_scans(profile=name, limit=20)
     removals = db.get_removals(profile=name)
 
-    return templates.TemplateResponse("profile_detail.html", {
-        "request": request,
-        "active": "profiles",
-        "profile": profile,
-        "findings_count": findings_count,
-        "scans": scans,
-        "removals": removals,
-    })
+    return templates.TemplateResponse("profile_detail.html", _ctx(
+        request,
+        active="profiles",
+        profile=profile,
+        findings_count=findings_count,
+        scans=scans,
+        removals=removals,
+    ))
 
 
 @app.get("/scans", response_class=HTMLResponse)
@@ -197,14 +215,14 @@ async def scans_page(request: Request, message: Optional[str] = None):
     scans = db.get_scans(limit=100)
     active = [t for t in task_manager.list_tasks() if t.status == TaskStatus.RUNNING]
 
-    return templates.TemplateResponse("scans.html", {
-        "request": request,
-        "active": "scans",
-        "scans": scans,
-        "profiles": list_profiles(),
-        "active_tasks": active,
-        "message": message,
-    })
+    return templates.TemplateResponse("scans.html", _ctx(
+        request,
+        active="scans",
+        scans=scans,
+        profiles=list_profiles(),
+        active_tasks=active,
+        message=message,
+    ))
 
 
 @app.post("/scans/trigger")
@@ -321,10 +339,10 @@ async def scans_active(request: Request):
 @app.get("/accounts", response_class=HTMLResponse)
 async def accounts_page(request: Request):
     """Accounts discovery page."""
-    return templates.TemplateResponse("accounts.html", {
-        "request": request,
-        "active": "accounts",
-    })
+    return templates.TemplateResponse("accounts.html", _ctx(
+        request,
+        active="accounts",
+    ))
 
 
 @app.post("/accounts/search", response_class=HTMLResponse)
@@ -335,18 +353,18 @@ async def accounts_search(request: Request, query: str = Form(...), search_type:
 
     if search_type == "email":
         if "@" not in query:
-            return templates.TemplateResponse("accounts_results.html", {
-                "request": request,
-                "results": [],
-                "search_type": search_type,
-                "query": query,
-                "error": f"Invalid email address: {query}",
-                "breach_count": 0,
-                "paste_count": 0,
-                "account_count": 0,
-                "risk_level": "LOW",
-                "risk_detail": "",
-            })
+            return templates.TemplateResponse("accounts_results.html", _ctx(
+                request,
+                results=[],
+                search_type=search_type,
+                query=query,
+                error=f"Invalid email address: {query}",
+                breach_count=0,
+                paste_count=0,
+                account_count=0,
+                risk_level="LOW",
+                risk_detail="",
+            ))
 
         # Run Holehe
         try:
@@ -465,9 +483,9 @@ async def accounts_search(request: Request, query: str = Form(...), search_type:
 
     # Attach guide URLs to results where guides exist
     for r in results:
-        guide_name = r.site_name.lower().replace(" ", "-")
-        guide_path = GUIDES_DIR / f"{guide_name}.yaml"
-        if guide_path.exists():
+        guide_name = re.sub(r'[^a-zA-Z0-9_-]', '-', r.site_name.lower())
+        guide_path = (GUIDES_DIR / f"{guide_name}.yaml").resolve()
+        if guide_path.is_relative_to(GUIDES_DIR.resolve()) and guide_path.exists():
             r.guide_url = f"/static/guides/{guide_name}"
         else:
             r.guide_url = ""
@@ -476,18 +494,18 @@ async def accounts_search(request: Request, query: str = Form(...), search_type:
     if results and error:
         error = None
 
-    return templates.TemplateResponse("accounts_results.html", {
-        "request": request,
-        "results": results,
-        "search_type": search_type,
-        "query": query,
-        "error": error,
-        "breach_count": breach_count,
-        "paste_count": paste_count,
-        "account_count": account_count,
-        "risk_level": risk_level,
-        "risk_detail": risk_detail,
-    })
+    return templates.TemplateResponse("accounts_results.html", _ctx(
+        request,
+        results=results,
+        search_type=search_type,
+        query=query,
+        error=error,
+        breach_count=breach_count,
+        paste_count=paste_count,
+        account_count=account_count,
+        risk_level=risk_level,
+        risk_detail=risk_detail,
+    ))
 
 
 @app.get("/removals", response_class=HTMLResponse)
@@ -495,15 +513,15 @@ async def removals_page(request: Request, status: Optional[str] = None,
                         message: Optional[str] = None, message_type: Optional[str] = None):
     removals = db.get_removals(status=status)
 
-    return templates.TemplateResponse("removals.html", {
-        "request": request,
-        "active": "removals",
-        "removals": removals,
-        "profiles": list_profiles(),
-        "filter_status": status,
-        "message": message,
-        "message_type": message_type,
-    })
+    return templates.TemplateResponse("removals.html", _ctx(
+        request,
+        active="removals",
+        removals=removals,
+        profiles=list_profiles(),
+        filter_status=status,
+        message=message,
+        message_type=message_type,
+    ))
 
 
 @app.post("/removals/email")
@@ -550,7 +568,14 @@ async def trigger_form_removal(
 
 @app.post("/removals/{removal_id}/confirm")
 async def confirm_removal(request: Request, removal_id: int):
-    db.update_removal_status(removal_id, "confirmed")
+    try:
+        db.update_removal_status(removal_id, "confirmed")
+    except ValueError as e:
+        if request.headers.get("HX-Request"):
+            return HTMLResponse(str(e), status_code=409)
+        return RedirectResponse(
+            f"/removals?message={str(e)}&message_type=error", status_code=303
+        )
     db.log("removal_confirmed", details={"removal_id": removal_id})
 
     # For HTMX requests, return the updated row
@@ -586,7 +611,14 @@ async def confirm_removal(request: Request, removal_id: int):
 
 @app.post("/removals/{removal_id}/reappeared")
 async def reappeared_removal(request: Request, removal_id: int):
-    db.update_removal_status(removal_id, "reappeared")
+    try:
+        db.update_removal_status(removal_id, "reappeared")
+    except ValueError as e:
+        if request.headers.get("HX-Request"):
+            return HTMLResponse(str(e), status_code=409)
+        return RedirectResponse(
+            f"/removals?message={str(e)}&message_type=error", status_code=303
+        )
     db.log("removal_reappeared", details={"removal_id": removal_id})
 
     if request.headers.get("HX-Request"):
@@ -622,23 +654,23 @@ async def brokers_page(request: Request, priority: Optional[str] = None):
     priority_order = {"critical": 0, "high": 1, "medium": 2, "low": 3}
     brokers.sort(key=lambda b: priority_order.get(b.priority.value, 4))
 
-    return templates.TemplateResponse("brokers.html", {
-        "request": request,
-        "active": "brokers",
-        "brokers": brokers,
-        "filter_priority": priority,
-    })
+    return templates.TemplateResponse("brokers.html", _ctx(
+        request,
+        active="brokers",
+        brokers=brokers,
+        filter_priority=priority,
+    ))
 
 
 @app.get("/activity", response_class=HTMLResponse)
 async def activity_page(request: Request):
     entries = db.get_audit_log(limit=200)
 
-    return templates.TemplateResponse("activity.html", {
-        "request": request,
-        "active": "activity",
-        "entries": entries,
-    })
+    return templates.TemplateResponse("activity.html", _ctx(
+        request,
+        active="activity",
+        entries=entries,
+    ))
 
 
 # ---------------------------------------------------------------------------

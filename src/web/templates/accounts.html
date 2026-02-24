@@ -11,6 +11,7 @@
 <div class="bg-dark-700 rounded-lg border border-dark-600 mb-6 p-5">
     <h3 class="text-sm font-semibold text-white mb-4">Search</h3>
     <form hx-post="/accounts/search" hx-target="#results" hx-indicator="#loading" hx-swap="innerHTML">
+        <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
         <div class="flex flex-wrap items-end gap-4">
             <!-- Search Type Radio Buttons -->
             <div>

@@ -20,6 +20,7 @@
 <div class="bg-dark-700 rounded-lg border border-dark-600 mb-6 p-5">
     <h3 class="text-sm font-semibold text-white mb-3">Send Email Removal Requests</h3>
     <form method="post" action="/removals/email" class="flex items-end gap-3">
+        <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
         <div>
             <label class="block text-xs text-dark-300 mb-1">Profile</label>
             <select name="profile" class="bg-dark-800 border border-dark-500 rounded px-3 py-1.5 text-sm text-white focus:border-blue-500 focus:outline-none">
@@ -86,6 +87,7 @@
                         {% if r.status in ('submitted', 'pending') %}
                         <form method="post" action="/removals/{{ r.id }}/confirm" class="inline"
                               hx-post="/removals/{{ r.id }}/confirm" hx-target="#removal-{{ r.id }}" hx-swap="outerHTML">
+                            <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
                             <button type="submit" class="px-2 py-0.5 text-xs bg-green-800 hover:bg-green-700 rounded text-green-200 transition-colors">
                                 Confirm
                             </button>
@@ -94,6 +96,7 @@
                         {% if r.status == 'confirmed' %}
                         <form method="post" action="/removals/{{ r.id }}/reappeared" class="inline"
                               hx-post="/removals/{{ r.id }}/reappeared" hx-target="#removal-{{ r.id }}" hx-swap="outerHTML">
+                            <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
                             <button type="submit" class="px-2 py-0.5 text-xs bg-red-800 hover:bg-red-700 rounded text-red-200 transition-colors">
                                 Reappeared
                             </button>

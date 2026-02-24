@@ -110,6 +110,7 @@
             {% if stats.profile_names %}
             {% for name in stats.profile_names %}
             <form method="post" action="/scans/trigger" class="inline">
+                <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
                 <input type="hidden" name="profile" value="{{ name }}">
                 <button type="submit" class="w-full text-left px-3 py-2 bg-dark-600 hover:bg-dark-500 rounded text-sm transition-colors">
                     Run full scan for <span class="font-semibold text-white">{{ name }}</span>

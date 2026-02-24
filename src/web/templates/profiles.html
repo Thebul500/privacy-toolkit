@@ -15,6 +15,7 @@
         <h3 class="text-sm font-semibold text-white">Create New Profile</h3>
     </div>
     <form method="post" action="/profiles" class="p-5 space-y-4">
+        <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
                 <label class="block text-xs text-dark-300 mb-1">Profile Name *</label>

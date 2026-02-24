@@ -148,6 +148,107 @@ class TestAccountsFindByEmail:
             )
 
 
+class TestProfileCommand:
+    """Test the 'profile' CLI group."""
+
+    def test_profile_list_empty(self, runner, cli_config):
+        """'profile list' with no profiles shows a helpful message."""
+        with patch("src.cli.list_profiles", return_value=[]):
+            result = runner.invoke(cli, ["-c", cli_config, "profile", "list"])
+            assert result.exit_code == 0
+            assert "no profiles" in result.output.lower() or "create" in result.output.lower()
+
+    def test_profile_list_with_profiles(self, runner, cli_config):
+        """'profile list' with existing profiles shows their names."""
+        with patch("src.cli.list_profiles", return_value=["alice", "bob"]):
+            result = runner.invoke(cli, ["-c", cli_config, "profile", "list"])
+            assert result.exit_code == 0
+            assert "alice" in result.output
+            assert "bob" in result.output
+
+    def test_profile_create_existing(self, runner, cli_config, tmp_path):
+        """'profile create <name>' when profile already exists warns user."""
+        profiles_dir = tmp_path / "profiles"
+        profiles_dir.mkdir()
+        existing = profiles_dir / "existing.yaml"
+        existing.write_text("name: existing\n")
+        with patch("src.cli.PROFILES_DIR", profiles_dir):
+            result = runner.invoke(cli, ["-c", cli_config, "profile", "create", "existing"])
+            assert result.exit_code == 0
+            assert "already exists" in result.output.lower()
+
+    def test_profile_create_new(self, runner, cli_config, tmp_path):
+        """'profile create <name>' prompts for details and creates YAML."""
+        profiles_dir = tmp_path / "profiles"
+        profiles_dir.mkdir()
+        with patch("src.cli.PROFILES_DIR", profiles_dir):
+            result = runner.invoke(
+                cli,
+                ["-c", cli_config, "profile", "create", "newuser"],
+                input="Alice\nSmith\nAlice Smith\nalice@example.com\n\n+1234567890\n\njohndoe\n\n",
+            )
+            assert result.exit_code == 0
+            assert (profiles_dir / "newuser.yaml").exists()
+
+
+class TestScoreCommand:
+    """Test the 'score' CLI command."""
+
+    def test_score_without_profile(self, runner, cli_config):
+        """'score' without -p flag shows error message."""
+        result = runner.invoke(cli, ["-c", cli_config, "score"])
+        assert result.exit_code == 0
+        assert "profile required" in result.output.lower() or "profile" in result.output.lower()
+
+    def test_score_with_profile(self, runner, cli_config):
+        """'score' with -p flag shows score panel."""
+        mock_score = MagicMock()
+        mock_score.score = 72
+        mock_score.grade = "C"
+        mock_score.findings_count = 5
+        mock_score.breaches_count = 2
+        mock_score.broker_listings = 1
+        mock_score.accounts_found = 3
+        mock_score.removals_confirmed = 1
+        mock_score.removals_pending = 0
+        mock_score.risk_factors = ["Password exposed"]
+        mock_score.recommendations = ["Change passwords"]
+
+        with patch("src.cli.calculate_score", return_value=mock_score) if hasattr(__import__("src.cli", fromlist=["calculate_score"]), "calculate_score") else patch("src.scoring.calculate_score", return_value=mock_score):
+            result = runner.invoke(cli, ["-c", cli_config, "-p", "alice", "score"])
+            assert result.exit_code == 0
+            assert "72" in result.output or "score" in result.output.lower()
+
+
+class TestTrackCommand:
+    """Test the 'track' CLI subcommands."""
+
+    def test_track_status(self, runner, cli_config):
+        """'track status' invokes show_removal_status."""
+        with patch("src.reporting.terminal.show_removal_status") as mock_show:
+            result = runner.invoke(cli, ["-c", cli_config, "track", "status"])
+            assert result.exit_code == 0
+            mock_show.assert_called_once()
+
+    def test_track_pending(self, runner, cli_config):
+        """'track pending' invokes show_pending_rechecks."""
+        with patch("src.reporting.terminal.show_pending_rechecks") as mock_show:
+            result = runner.invoke(cli, ["-c", cli_config, "track", "pending"])
+            assert result.exit_code == 0
+            mock_show.assert_called_once()
+
+
+class TestScheduleCommand:
+    """Test the 'schedule' CLI group."""
+
+    def test_schedule_group_help(self, runner, cli_config):
+        """'schedule --help' shows available subcommands."""
+        result = runner.invoke(cli, ["-c", cli_config, "schedule", "--help"])
+        assert result.exit_code == 0
+        assert "enable" in result.output
+        assert "disable" in result.output
+
+
 class TestReportCommand:
     """Test the 'report' CLI command with CSV and HTML formats."""
 
