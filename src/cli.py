@@ -1320,7 +1320,7 @@ def track_bounces(ctx):
     console.print(f"\n[yellow]Found {len(bounces)} bounced address(es):[/yellow]")
     for b in bounces:
         console.print(f"  [red]{b['address']}[/red] — {b['error']}")
-    console.print(f"\n[dim]Matching removal requests have been marked as rejected.[/dim]")
+    console.print("\n[dim]Matching removal requests have been marked as rejected.[/dim]")
 
 
 # ============================================================================
