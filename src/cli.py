@@ -1534,6 +1534,19 @@ def profile_create(name):
             break
         usernames.append(uname)
 
+    US_STATES = {
+        "AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "FL", "GA",
+        "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD",
+        "MA", "MI", "MN", "MS", "MO", "MT", "NE", "NV", "NH", "NJ",
+        "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "RI", "SC",
+        "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY", "DC",
+    }
+    state = click.prompt("State of residence (2-letter code, e.g. IL, CA, TX)", default="US")
+    state = state.upper().strip()
+    if state not in US_STATES and state != "US":
+        console.print(f"[yellow]'{state}' not recognized. Using 'US' as default.[/yellow]")
+        state = "US"
+
     p = Profile(
         name=name,
         first_name=first,
@@ -1542,6 +1555,7 @@ def profile_create(name):
         email_addresses=emails,
         phone_numbers=phones,
         usernames=usernames,
+        jurisdiction=state,
     )
     p.to_yaml(path)
     console.print(f"\n[green]Profile saved to {path}[/green]")

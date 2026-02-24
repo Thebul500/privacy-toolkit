@@ -101,6 +101,8 @@ class EmailRemover:
             "listing_urls": evidence["listing_urls"],
             "data_types_found": evidence["data_types_found"],
             "privacy_policy_url": evidence["privacy_policy_url"],
+            "jurisdiction": profile.jurisdiction,
+            "applicable_laws": profile.applicable_laws,
         }
         context.update(extra_vars)
         return template.render(**context)
@@ -164,7 +166,7 @@ class EmailRemover:
         )
         plain_body = _html_to_plain(html_body)
 
-        subject = method.subject or f"Formal Data Deletion Request Pursuant to CCPA/GDPR \u2014 Ref: {request_id}"
+        subject = method.subject or f"Formal Data Deletion Request Pursuant to Applicable Privacy Laws \u2014 Ref: {request_id}"
         from_addr = self.smtp.from_email or self.smtp.username
         from_name = profile.full_name or f"{profile.first_name} {profile.last_name}".strip()
         reply_to = profile.primary_email or from_addr

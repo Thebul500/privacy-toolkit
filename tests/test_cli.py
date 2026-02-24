@@ -185,7 +185,7 @@ class TestProfileCommand:
             result = runner.invoke(
                 cli,
                 ["-c", cli_config, "profile", "create", "newuser"],
-                input="Alice\nSmith\nAlice Smith\nalice@example.com\n\n+1234567890\n\njohndoe\n\n",
+                input="Alice\nSmith\nAlice Smith\nalice@example.com\n\n+1234567890\n\njohndoe\n\nIL\n",
             )
             assert result.exit_code == 0
             assert (profiles_dir / "newuser.yaml").exists()
