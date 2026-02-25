@@ -126,6 +126,11 @@ class Database:
                 CREATE UNIQUE INDEX IF NOT EXISTS idx_findings_unique
                 ON findings(profile, source, site_name, site_url, data_type)
             """)
+            # Phase 1 migration: rescan_count column
+            try:
+                conn.execute("ALTER TABLE removal_requests ADD COLUMN rescan_count INTEGER DEFAULT 0")
+            except sqlite3.OperationalError:
+                pass  # Column already exists
             conn.commit()
             conn.close()
         except sqlite3.Error as e:
@@ -473,6 +478,113 @@ class Database:
         ).fetchall()
         conn.close()
         return [dict(r) for r in rows]
+
+    # --- Broker Compliance ---
+
+    def get_broker_compliance(self, broker_slug: Optional[str] = None) -> list[dict]:
+        """Compute per-broker compliance stats from removal request data."""
+        conn = self._connect()
+        query = """
+            SELECT
+                broker_slug,
+                broker_name,
+                COUNT(*) AS total_requests,
+                SUM(CASE WHEN confirmed_at IS NOT NULL THEN 1 ELSE 0 END) AS confirmed_count,
+                SUM(CASE WHEN status = 'rejected' THEN 1 ELSE 0 END) AS rejected_count,
+                SUM(CASE WHEN status = 'reappeared' THEN 1 ELSE 0 END) AS reappeared_count,
+                SUM(CASE WHEN notes LIKE '%bounce%' THEN 1 ELSE 0 END) AS bounce_count,
+                AVG(CASE WHEN confirmed_at IS NOT NULL
+                    THEN julianday(confirmed_at) - julianday(submitted_at)
+                    ELSE NULL END) AS avg_days_to_confirm
+            FROM removal_requests
+        """
+        params: list[Any] = []
+        if broker_slug:
+            query += " WHERE broker_slug = ?"
+            params.append(broker_slug)
+        query += " GROUP BY broker_slug ORDER BY total_requests DESC"
+        rows = conn.execute(query, params).fetchall()
+        conn.close()
+
+        results = []
+        for r in rows:
+            d = dict(r)
+            total = d["total_requests"]
+            confirmed = d["confirmed_count"]
+            reappeared = d["reappeared_count"]
+
+            d["compliance_rate"] = round((confirmed / total) * 100, 1) if total > 0 else 0.0
+            d["reappearance_rate"] = round((reappeared / total) * 100, 1) if total > 0 else 0.0
+            d["avg_days_to_confirm"] = round(d["avg_days_to_confirm"], 1) if d["avg_days_to_confirm"] else None
+
+            if total < 3:
+                d["compliance_label"] = "undetermined"
+            elif d["compliance_rate"] > 80:
+                d["compliance_label"] = "compliant"
+            elif d["compliance_rate"] >= 50:
+                d["compliance_label"] = "inconsistent"
+            else:
+                d["compliance_label"] = "resistant"
+
+            results.append(d)
+        return results
+
+    # --- Confirmed Rescan ---
+
+    def get_confirmed_for_rescan(self, profile: Optional[str] = None) -> list[dict]:
+        """Get confirmed removals that are past their next_rescan_at date."""
+        conn = self._connect()
+        query = """SELECT * FROM removal_requests
+            WHERE status = 'confirmed' AND next_rescan_at IS NOT NULL AND next_rescan_at <= ?"""
+        params: list[Any] = [_now()]
+        if profile:
+            query += " AND profile = ?"
+            params.append(profile)
+        query += " ORDER BY next_rescan_at ASC"
+        rows = conn.execute(query, params).fetchall()
+        conn.close()
+        return [dict(r) for r in rows]
+
+    def increment_rescan_count(self, removal_id: int) -> None:
+        """Bump the rescan_count column for a removal request."""
+        conn = self._connect()
+        conn.execute(
+            "UPDATE removal_requests SET rescan_count = COALESCE(rescan_count, 0) + 1 WHERE id = ?",
+            (removal_id,),
+        )
+        conn.commit()
+        conn.close()
+
+    def reset_for_resubmission(self, removal_id: int, rescan_days: int = 90) -> None:
+        """Transition a reappeared removal back to pending for resubmission."""
+        conn = self._connect()
+        row = conn.execute("SELECT status FROM removal_requests WHERE id = ?", (removal_id,)).fetchone()
+        if row is None:
+            conn.close()
+            raise ValueError(f"Removal request {removal_id} not found")
+        if row["status"] != "reappeared":
+            conn.close()
+            raise ValueError(f"Can only reset reappeared removals, got: {row['status']}")
+        now = _now()
+        conn.execute(
+            """UPDATE removal_requests
+            SET status = 'pending', submitted_at = NULL, confirmed_at = NULL,
+                recheck_at = NULL, next_rescan_at = ?, updated_at = ?
+            WHERE id = ?""",
+            (_future(rescan_days), now, removal_id),
+        )
+        conn.commit()
+        conn.close()
+
+    def push_next_rescan(self, removal_id: int, days: int = 90) -> None:
+        """Push next_rescan_at forward for a confirmed removal that is still clear."""
+        conn = self._connect()
+        conn.execute(
+            "UPDATE removal_requests SET next_rescan_at = ?, updated_at = ? WHERE id = ?",
+            (_future(days), _now(), removal_id),
+        )
+        conn.commit()
+        conn.close()
 
 
 def _now() -> str:

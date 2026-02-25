@@ -10,6 +10,12 @@ from typing import Any, Optional
 import yaml
 
 
+DATA_SENSITIVITY = {
+    "financial": 5, "ssn": 5, "health": 4, "phone": 3,
+    "email": 3, "address": 3, "name": 2, "demographic": 1,
+}
+
+
 class Priority(str, Enum):
     CRITICAL = "critical"
     HIGH = "high"

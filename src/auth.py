@@ -23,7 +23,7 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse, RedirectResponse
 
 EXEMPT_PREFIXES = ("/api/health", "/static/", "/docs", "/openapi.json")
-PASSWORD_EXEMPT = ("/api/health", "/static/", "/login", "/logout", "/setup")
+PASSWORD_EXEMPT = ("/api/", "/static/", "/login", "/logout", "/setup")
 
 # In-memory session store: token -> {"created_at": float, "password_hash": bytes}
 _sessions: dict[str, dict] = {}

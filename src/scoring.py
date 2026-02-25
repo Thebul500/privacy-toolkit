@@ -88,8 +88,20 @@ def calculate_score(db, profile: str) -> PrivacyScore:
     # --- Calculate score ---
     score = 100
 
-    # -3 per data broker listing
-    score -= 3 * len(broker_listings)
+    # Compliance-weighted broker penalties
+    compliance_map: dict[str, str] = {}
+    try:
+        for c in db.get_broker_compliance():
+            compliance_map[c["broker_slug"]] = c["compliance_label"]
+    except Exception:
+        pass  # Fall back to flat penalty if compliance query fails
+
+    penalty_by_label = {"resistant": 5, "inconsistent": 4}
+    for bl in broker_listings:
+        site_name = bl.get("site_name", "")
+        slug = site_name.lower().replace(" ", "-").replace(".", "-")
+        label = compliance_map.get(slug, "")
+        score -= penalty_by_label.get(label, 3)
 
     # Breaches: -5 with password, -2 without
     for b in breaches:

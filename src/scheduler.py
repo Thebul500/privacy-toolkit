@@ -143,6 +143,29 @@ def _scheduled_verification(profile_name: str, config: "Config", db: "Database",
     )
 
 
+def _scheduled_confirmed_rescan(profile_name: str, config: "Config", db: "Database",
+                                task_manager: "TaskManager") -> None:
+    """Re-scan confirmed removals to check for re-listing."""
+    from src.tasks import run_confirmed_rescan
+    logger.info("Scheduled confirmed rescan starting for profile: %s", profile_name)
+    task_manager.submit(
+        f"Confirmed rescan: {profile_name}",
+        run_confirmed_rescan, profile_name, config, db,
+        profile=profile_name,
+    )
+
+
+def _scheduled_digest(config: "Config", db: "Database",
+                      task_manager: "TaskManager") -> None:
+    """Send the weekly privacy digest."""
+    from src.digest import send_digest
+    logger.info("Generating weekly digest")
+    try:
+        send_digest(db, config, period="weekly")
+    except Exception as e:
+        logger.error("Failed to send weekly digest: %s", e)
+
+
 def _scheduled_follow_ups(config: "Config", db: "Database",
                           task_manager: "TaskManager") -> None:
     """Check for overdue removals and send follow-up emails."""
@@ -221,6 +244,29 @@ def setup_apscheduler(config: "Config", db: "Database",
         replace_existing=True,
     )
     logger.info("Scheduled daily follow-up check at 10 AM")
+
+    # Weekly confirmed rescan (Wednesdays 2 PM)
+    for profile_name in profiles:
+        scheduler.add_job(
+            _scheduled_confirmed_rescan,
+            CronTrigger(day_of_week="wed", hour=14, minute=0),
+            args=[profile_name, config, db, task_manager],
+            id=f"confirmed_rescan_{profile_name}",
+            name=f"Confirmed rescan: {profile_name}",
+            replace_existing=True,
+        )
+    logger.info("Scheduled weekly confirmed rescan (Wed 2 PM)")
+
+    # Weekly digest (Sunday 8 PM)
+    scheduler.add_job(
+        _scheduled_digest,
+        CronTrigger(day_of_week="sun", hour=20, minute=0),
+        args=[config, db, task_manager],
+        id="weekly_digest",
+        name="Weekly digest",
+        replace_existing=True,
+    )
+    logger.info("Scheduled weekly digest (Sun 8 PM)")
 
     scheduler.start()
     logger.info("APScheduler started with %d job(s)", len(scheduler.get_jobs()))

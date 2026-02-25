@@ -82,8 +82,10 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         return response
 
 
+from src.api import router as api_router
 from src.auth import APIKeyMiddleware, PasswordAuthMiddleware, create_session, destroy_session
 from src.csrf import CSRFMiddleware
+app.include_router(api_router)
 app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(CSRFMiddleware)
 app.add_middleware(PasswordAuthMiddleware)
@@ -710,6 +712,9 @@ async def brokers_page(request: Request, priority: Optional[str] = None):
     priority_order = {"critical": 0, "high": 1, "medium": 2, "low": 3}
     brokers.sort(key=lambda b: priority_order.get(b.priority.value, 4))
 
+    # Build compliance lookup for template
+    compliance = {c["broker_slug"]: c for c in db.get_broker_compliance()}
+
     return templates.TemplateResponse("brokers.html", _ctx(
         request,
         active="brokers",
@@ -717,6 +722,7 @@ async def brokers_page(request: Request, priority: Optional[str] = None):
         filter_priority=priority,
         scanner_slugs=set(SITE_BY_SLUG.keys()),
         profiles=list_profiles(),
+        compliance=compliance,
     ))
 
 
@@ -978,31 +984,4 @@ async def logout(request: Request):
     return response
 
 
-# ---------------------------------------------------------------------------
-# API ROUTES (JSON)
-# ---------------------------------------------------------------------------
-
-@app.get("/api/health")
-async def api_health():
-    return {"status": "ok", "tasks_active": task_manager.active_count}
-
-
-@app.get("/api/stats")
-async def api_stats():
-    profiles_list = list_profiles()
-    findings_count = db.get_findings_count()
-    removals = db.get_removals()
-
-    breakdown: dict[str, int] = {}
-    for r in removals:
-        s = r.get("status", "unknown")
-        breakdown[s] = breakdown.get(s, 0) + 1
-
-    return {
-        "profiles": len(profiles_list),
-        "findings": findings_count,
-        "removals_total": len(removals),
-        "removals_by_status": breakdown,
-        "brokers_configured": len(load_all_brokers()),
-        "tasks_active": task_manager.active_count,
-    }
+# API routes moved to src/api.py (mounted via api_router)

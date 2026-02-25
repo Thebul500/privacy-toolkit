@@ -382,11 +382,13 @@ def run_verification_scans(profile_name: str, config, db) -> dict:
                 db.update_removal_status(removal_id, "confirmed")  # must go through confirmed first
                 db.update_removal_status(removal_id, "reappeared",
                                          notes="Auto-verified: listing still present")
+                db.increment_rescan_count(removal_id)
+                db.reset_for_resubmission(removal_id)
                 reappeared += 1
-                logger.warning("Listing reappeared for %s on %s", profile_name, broker_slug)
+                logger.warning("Listing reappeared for %s on %s — auto-resubmitting", profile_name, broker_slug)
                 notify(
                     "removal_reappeared",
-                    f"Privacy Toolkit: Listing reappeared for {profile_name} on {broker_slug}",
+                    f"Privacy Toolkit: Listing reappeared for {profile_name} on {broker_slug}. Auto-resubmitting removal request.",
                     config,
                     details={"profile": profile_name, "broker": broker_slug},
                 )
@@ -398,6 +400,66 @@ def run_verification_scans(profile_name: str, config, db) -> dict:
         "verified": verified, "confirmed": confirmed, "reappeared": reappeared,
     })
     return {"verified": verified, "confirmed": confirmed, "reappeared": reappeared}
+
+
+def run_confirmed_rescan(profile_name: str, config, db) -> dict:
+    """Re-scan confirmed removals past their rescan date to check for re-listing."""
+    from src.config import load_profile
+    from src.notifications import notify
+    from src.scanners.people_search_scanner import has_scanner_config, scan_single
+
+    due = db.get_confirmed_for_rescan(profile=profile_name)
+    if not due:
+        logger.info("No confirmed removals due for rescan for %s", profile_name)
+        return {"checked": 0, "still_clear": 0, "relisted": 0}
+
+    profile = load_profile(profile_name)
+    still_clear = 0
+    relisted = 0
+
+    for removal in due:
+        broker_slug = removal["broker_slug"]
+        removal_id = removal["id"]
+
+        if not has_scanner_config(broker_slug):
+            logger.debug("No scanner config for %s, skipping rescan", broker_slug)
+            continue
+
+        try:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                findings = loop.run_until_complete(scan_single(profile, broker_slug))
+            finally:
+                loop.close()
+
+            if not findings:
+                # Still clear — push rescan date forward
+                db.push_next_rescan(removal_id, days=90)
+                still_clear += 1
+                logger.info("Confirmed removal still clear for %s on %s", profile_name, broker_slug)
+            else:
+                # Re-listed — transition confirmed→reappeared, then reset to pending
+                db.update_removal_status(removal_id, "reappeared",
+                                         notes="Rescan: listing reappeared")
+                db.increment_rescan_count(removal_id)
+                db.reset_for_resubmission(removal_id)
+                relisted += 1
+                logger.warning("Confirmed removal re-listed for %s on %s", profile_name, broker_slug)
+                notify(
+                    "removal_relisted",
+                    f"Privacy Toolkit: Confirmed removal re-listed for {profile_name} on {broker_slug}. Auto-resubmitting.",
+                    config,
+                    details={"profile": profile_name, "broker": broker_slug},
+                )
+        except Exception as e:
+            logger.error("Confirmed rescan failed for %s/%s: %s", profile_name, broker_slug, e)
+
+    checked = still_clear + relisted
+    db.log("confirmed_rescan", profile_name, {
+        "checked": checked, "still_clear": still_clear, "relisted": relisted,
+    })
+    return {"checked": checked, "still_clear": still_clear, "relisted": relisted}
 
 
 def run_follow_ups(config, db) -> dict:

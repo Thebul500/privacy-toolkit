@@ -1467,6 +1467,60 @@ def track_responses(ctx):
         console.print(f"[bold yellow]{action_needed} response(s) require manual action.[/bold yellow]")
 
 
+@track.command("rescan-status")
+@click.pass_context
+def track_rescan_status(ctx):
+    """Show confirmed removals and their rescan schedule."""
+    db = ctx.obj["db"]
+    profile_name = ctx.obj["profile_name"]
+    removals = db.get_removals(profile=profile_name, status="confirmed")
+
+    if not removals:
+        console.print("[yellow]No confirmed removals found.[/yellow]")
+        return
+
+    table = Table(title="Confirmed Removal Rescan Status")
+    table.add_column("ID", justify="right", width=5)
+    table.add_column("Broker", style="bold", width=25)
+    table.add_column("Confirmed", width=12)
+    table.add_column("Next Rescan", width=12)
+    table.add_column("Rescan #", justify="right", width=9)
+
+    for r in removals:
+        confirmed = r.get("confirmed_at", "—")[:10] if r.get("confirmed_at") else "—"
+        rescan = r.get("next_rescan_at", "—")[:10] if r.get("next_rescan_at") else "—"
+        count = str(r.get("rescan_count") or 0)
+        table.add_row(str(r["id"]), r["broker_name"], confirmed, rescan, count)
+
+    console.print(table)
+
+
+# ============================================================================
+# DIGEST COMMAND
+# ============================================================================
+
+@cli.command("digest")
+@click.option("--period", type=click.Choice(["weekly", "monthly"]), default="weekly")
+@click.option("--send/--no-send", default=False, help="Send via configured notification channels")
+@click.pass_context
+def digest(ctx, period, send):
+    """Generate a privacy activity digest summary."""
+    from src.digest import generate_digest, send_digest
+
+    config = ctx.obj["config"]
+    db = ctx.obj["db"]
+
+    if send:
+        sent = send_digest(db, config, period)
+        if sent:
+            console.print(f"[green]{period.title()} digest sent successfully.[/green]")
+        else:
+            console.print("[yellow]No activity this period — digest not sent.[/yellow]")
+    else:
+        result = generate_digest(db, config, period)
+        console.print(Panel(result["text_message"], title=f"{period.title()} Digest"))
+
+
 # ============================================================================
 # SCORE COMMAND
 # ============================================================================
@@ -1824,6 +1878,51 @@ def brokers_list(ctx):
             f"[{color}]{b.priority.value}[/{color}]",
             methods,
             b.category,
+        )
+
+    console.print(table)
+
+
+@brokers.command("compliance")
+@click.pass_context
+def brokers_compliance(ctx):
+    """Show broker compliance stats based on removal request history."""
+    db = ctx.obj["db"]
+    data = db.get_broker_compliance()
+
+    if not data:
+        console.print("[yellow]No removal data to compute compliance.[/yellow]")
+        return
+
+    table = Table(title="Broker Compliance")
+    table.add_column("Broker", style="bold", width=25)
+    table.add_column("Total", justify="right", width=6)
+    table.add_column("Confirmed", justify="right", width=10)
+    table.add_column("Rejected", justify="right", width=9)
+    table.add_column("Reappeared", justify="right", width=11)
+    table.add_column("Avg Days", justify="right", width=9)
+    table.add_column("Rate%", justify="right", width=7)
+    table.add_column("Label", width=14)
+
+    label_colors = {
+        "compliant": "green",
+        "inconsistent": "yellow",
+        "resistant": "red",
+        "undetermined": "dim",
+    }
+
+    for row in data:
+        color = label_colors.get(row["compliance_label"], "")
+        avg = f"{row['avg_days_to_confirm']:.0f}" if row["avg_days_to_confirm"] else "—"
+        table.add_row(
+            row["broker_name"],
+            str(row["total_requests"]),
+            str(row["confirmed_count"]),
+            str(row["rejected_count"]),
+            str(row["reappeared_count"]),
+            avg,
+            f"{row['compliance_rate']:.0f}",
+            f"[{color}]{row['compliance_label']}[/{color}]",
         )
 
     console.print(table)
