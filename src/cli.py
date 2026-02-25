@@ -1861,8 +1861,6 @@ def setup(ctx):
 
     from src.config import DEFAULT_CONFIG, PROFILES_DIR, is_setup_complete
 
-    config_obj = ctx.obj["config"]
-
     console.print(Panel(
         "[bold]Welcome to Privacy Toolkit Setup[/bold]\n\n"
         "This wizard will help you:\n"
@@ -1889,7 +1887,7 @@ def setup(ctx):
             DEFAULT_CONFIG.parent.mkdir(parents=True, exist_ok=True)
             DEFAULT_CONFIG.write_text("")
             console.print(f"  [green]Created empty config:[/green] {DEFAULT_CONFIG}")
-        config_obj = Config.load()
+        Config.load()  # validate saved config
 
     # Step 2 — SMTP
     console.print("\n[bold cyan]Step 2: Email Setup (Gmail)[/bold cyan]")
@@ -1927,7 +1925,7 @@ def setup(ctx):
             data["smtp"].setdefault("use_tls", True)
             with open(DEFAULT_CONFIG, "w") as f:
                 yaml.dump(data, f, default_flow_style=False, sort_keys=False)
-            config_obj = Config.load()
+            Config.load()  # validate saved config
             console.print("  [green]Saved to config/config.yaml[/green]")
         else:
             console.print("  Skipped. You can set up email later.")

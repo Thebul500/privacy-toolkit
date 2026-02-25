@@ -28,7 +28,7 @@ from src.config import (
 from src.db import Database
 from src.models import Profile
 from src.scoring import calculate_score
-from src.tasks import TaskManager, TaskStatus, run_email_removals, run_full_scan, run_url_discovery
+from src.tasks import TaskManager, TaskStatus, run_email_removals, run_full_scan
 
 GUIDES_DIR = TOOLKIT_DIR / "guides"
 
@@ -745,7 +745,6 @@ async def verify_broker_listing(request: Request, slug: str, profile: str = Form
             f'Profile "{profile_name}" not found.</div>'
         )
 
-    import asyncio
     try:
         findings = await scan_single(loaded_profile, slug)
     except Exception as e:
