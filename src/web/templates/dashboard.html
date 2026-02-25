@@ -126,7 +126,10 @@
                 <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
                 <p class="empty-title">Create a profile to start scanning</p>
                 <p class="empty-hint">Profiles define the identities you want to monitor</p>
-                <a href="/profiles" class="btn-primary mt-3 text-xs">Create Profile</a>
+                <div class="flex gap-2 mt-3">
+                    <a href="/profiles" class="btn-primary text-xs">Create Profile</a>
+                    <a href="/accounts" class="btn-primary bg-dark-600 hover:bg-dark-500 text-xs">Quick Account Search</a>
+                </div>
             </div>
             {% endif %}
         </div>

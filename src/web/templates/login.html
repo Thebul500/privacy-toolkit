@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Privacy Toolkit</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/static/style.css">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: { extend: { colors: { dark: { 50:'#f8fafc',100:'#e2e8f0',200:'#94a3b8',300:'#64748b',400:'#475569',500:'#334155',600:'#1e293b',700:'#0f172a',800:'#0d1117',900:'#010409' }}}}
+        }
+    </script>
+</head>
+<body class="dark h-full bg-dark-800 text-dark-100 flex items-center justify-center">
+    <div class="w-full max-w-sm mx-auto px-4">
+        <div class="card p-6">
+            <div class="text-center mb-6">
+                <h1 class="text-xl font-bold text-white">Privacy Toolkit</h1>
+                <p class="text-dark-300 text-sm mt-1">Enter your password to continue</p>
+            </div>
+            {% if error %}
+            <div class="mb-4 px-3 py-2 rounded bg-red-900/50 border border-red-700 text-red-200 text-sm">
+                {{ error }}
+            </div>
+            {% endif %}
+            <form method="post" action="/login">
+                <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+                <div class="mb-4">
+                    <label for="password" class="block text-xs font-medium text-dark-300 mb-1.5">Password</label>
+                    <input type="password" id="password" name="password" required autofocus
+                           class="w-full bg-dark-800 border border-dark-500 rounded px-3 py-2 text-sm text-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 focus:outline-none">
+                </div>
+                <button type="submit" class="btn-primary w-full justify-center">Sign In</button>
+            </form>
+        </div>
+    </div>
+</body>
+</html>

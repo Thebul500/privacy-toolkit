@@ -4,6 +4,10 @@ services:
     container_name: privacy-toolkit
     ports:
       - "8384:8080"
+    environment:
+      # Simple password auth — set to enable (no OAuth2 proxy needed):
+      # - PRIVACY_TOOLKIT_PASSWORD=changeme
+      - PRIVACY_TOOLKIT_PASSWORD=${PRIVACY_TOOLKIT_PASSWORD:-}
     volumes:
       - ./data:/app/data
       - ./config:/app/config

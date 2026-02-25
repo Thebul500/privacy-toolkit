@@ -1,0 +1,229 @@
+{% extends "base.html" %}
+{% block title %}Setup - Privacy Toolkit{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto">
+
+    <!-- Progress Bar -->
+    <div class="mb-8">
+        <div class="flex items-center justify-between mb-2">
+            {% for i in range(1, 5) %}
+            <div class="flex items-center {% if i < 4 %}flex-1{% endif %}">
+                <div class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold
+                    {% if i < step %}bg-green-600 text-white
+                    {% elif i == step %}bg-blue-600 text-white
+                    {% else %}bg-dark-600 text-dark-300{% endif %}">
+                    {% if i < step %}
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                    {% else %}{{ i }}{% endif %}
+                </div>
+                {% if i < 4 %}
+                <div class="flex-1 h-0.5 mx-2 {% if i < step %}bg-green-600{% else %}bg-dark-600{% endif %}"></div>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+        <div class="flex justify-between text-xs text-dark-300">
+            <span>Welcome</span><span>Email</span><span>Profile</span><span>Ready</span>
+        </div>
+    </div>
+
+    <!-- Step 1: Welcome -->
+    {% if step == 1 %}
+    <div class="card p-6">
+        <div class="text-center mb-6">
+            <svg class="w-12 h-12 mx-auto text-blue-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+            </svg>
+            <h2 class="text-2xl font-bold text-white">Welcome to Privacy Toolkit</h2>
+            <p class="text-dark-300 mt-2 max-w-md mx-auto">
+                Take control of your personal data. This tool helps you discover where your
+                information is exposed online and automates opt-out requests to data brokers.
+            </p>
+        </div>
+        <div class="space-y-3 text-sm text-dark-200 mb-6">
+            <div class="flex items-start gap-3">
+                <span class="text-blue-400 font-bold mt-0.5">1.</span>
+                <span><strong class="text-white">Email setup</strong> (optional) &mdash; configure Gmail to send opt-out requests on your behalf</span>
+            </div>
+            <div class="flex items-start gap-3">
+                <span class="text-blue-400 font-bold mt-0.5">2.</span>
+                <span><strong class="text-white">Create a profile</strong> &mdash; tell us who you are so we can scan for your data</span>
+            </div>
+            <div class="flex items-start gap-3">
+                <span class="text-blue-400 font-bold mt-0.5">3.</span>
+                <span><strong class="text-white">Run your first scan</strong> &mdash; discover where your data lives across 80+ brokers</span>
+            </div>
+        </div>
+        <div class="text-center">
+            <a href="/setup?step=2" class="btn-primary px-8 py-2">Get Started</a>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Step 2: Email Setup -->
+    {% if step == 2 %}
+    <div class="card p-6">
+        <h2 class="text-xl font-bold text-white mb-1">Email Setup</h2>
+        <p class="text-dark-300 text-sm mb-4">Configure Gmail to send automated opt-out requests to data brokers.</p>
+
+        <div class="callout mb-4">
+            <div class="text-sm font-semibold text-yellow-300 mb-1">How to get a Gmail App Password</div>
+            <ol class="text-sm text-dark-200 space-y-1 list-decimal list-inside">
+                <li>Go to your <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noopener" class="text-blue-400 underline hover:text-blue-300">Google App Passwords page</a></li>
+                <li>Sign in and select "Mail" as the app</li>
+                <li>Click "Generate" and copy the 16-character password</li>
+                <li>Paste it below &mdash; this is NOT your regular Gmail password</li>
+            </ol>
+            <p class="text-xs text-dark-400 mt-2">Requires 2-Step Verification enabled on your Google account.</p>
+        </div>
+
+        <form method="post" action="/setup/smtp" id="smtp-form">
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+            <div class="space-y-3 mb-4">
+                <div>
+                    <label class="block text-xs font-medium text-dark-300 mb-1">Gmail Address</label>
+                    <input type="email" name="smtp_username" placeholder="you@gmail.com" required
+                           value="{{ smtp_username or '' }}"
+                           class="w-full bg-dark-800 border border-dark-500 rounded px-3 py-2 text-sm text-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-dark-300 mb-1">App Password</label>
+                    <input type="password" name="smtp_password" placeholder="xxxx xxxx xxxx xxxx" required
+                           class="w-full bg-dark-800 border border-dark-500 rounded px-3 py-2 text-sm text-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 focus:outline-none">
+                </div>
+            </div>
+
+            <div id="smtp-test-result"></div>
+
+            <div class="flex items-center gap-3 mt-4">
+                <button type="submit" class="btn-primary">Save & Continue</button>
+                <button type="button" class="btn-primary bg-dark-600 hover:bg-dark-500"
+                        hx-post="/setup/smtp-test"
+                        hx-include="#smtp-form"
+                        hx-target="#smtp-test-result"
+                        hx-swap="innerHTML">
+                    Test Connection
+                </button>
+            </div>
+        </form>
+
+        <div class="mt-4 pt-4 border-t border-dark-600">
+            <form method="post" action="/setup/skip-smtp">
+                <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+                <button type="submit" class="text-sm text-dark-400 hover:text-dark-200 underline">
+                    Skip for now &mdash; I'll set up email later
+                </button>
+            </form>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Step 3: Create Profile -->
+    {% if step == 3 %}
+    <div class="card p-6">
+        <h2 class="text-xl font-bold text-white mb-1">Create Your Profile</h2>
+        <p class="text-dark-300 text-sm mb-4">Tell us about yourself so we can scan for your data across data broker sites.</p>
+
+        <form method="post" action="/profiles">
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+            <input type="hidden" name="redirect" value="/setup?step=4">
+            <div class="space-y-3 mb-4">
+                <div>
+                    <label class="block text-xs font-medium text-dark-300 mb-1">Profile Name</label>
+                    <input type="text" name="name" placeholder="e.g. john-doe" required pattern="[a-zA-Z0-9_-]+"
+                           class="w-full bg-dark-800 border border-dark-500 rounded px-3 py-2 text-sm text-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 focus:outline-none">
+                    <p class="text-xs text-dark-400 mt-1">Letters, numbers, hyphens, underscores only</p>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-medium text-dark-300 mb-1">First Name</label>
+                        <input type="text" name="first_name" placeholder="John"
+                               class="w-full bg-dark-800 border border-dark-500 rounded px-3 py-2 text-sm text-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-dark-300 mb-1">Last Name</label>
+                        <input type="text" name="last_name" placeholder="Doe"
+                               class="w-full bg-dark-800 border border-dark-500 rounded px-3 py-2 text-sm text-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 focus:outline-none">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-dark-300 mb-1">Email Address</label>
+                    <input type="email" name="emails" placeholder="john@example.com"
+                           class="w-full bg-dark-800 border border-dark-500 rounded px-3 py-2 text-sm text-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 focus:outline-none">
+                    <p class="text-xs text-dark-400 mt-1">Separate multiple with commas</p>
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-dark-300 mb-1">Phone Number</label>
+                    <input type="tel" name="phones" placeholder="+15551234567"
+                           class="w-full bg-dark-800 border border-dark-500 rounded px-3 py-2 text-sm text-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 focus:outline-none">
+                    <p class="text-xs text-dark-400 mt-1">Optional. Include country code.</p>
+                </div>
+                <input type="hidden" name="usernames" value="">
+            </div>
+            <button type="submit" class="btn-primary">Create Profile & Continue</button>
+        </form>
+    </div>
+    {% endif %}
+
+    <!-- Step 4: Ready -->
+    {% if step == 4 %}
+    <div class="card p-6">
+        <div class="text-center mb-6">
+            <svg class="w-12 h-12 mx-auto text-green-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+            <h2 class="text-2xl font-bold text-white">You're All Set!</h2>
+            <p class="text-dark-300 mt-2">Here's what's configured:</p>
+        </div>
+
+        <div class="space-y-2 mb-6">
+            <div class="flex items-center gap-3 p-3 rounded bg-dark-800">
+                {% if setup_status.config_exists %}
+                <svg class="w-5 h-5 text-green-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                <span class="text-sm text-white">Configuration file</span>
+                {% else %}
+                <svg class="w-5 h-5 text-yellow-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01"/></svg>
+                <span class="text-sm text-dark-300">Configuration file &mdash; <a href="/setup?step=2" class="text-blue-400 underline">set up</a></span>
+                {% endif %}
+            </div>
+            <div class="flex items-center gap-3 p-3 rounded bg-dark-800">
+                {% if setup_status.smtp_configured %}
+                <svg class="w-5 h-5 text-green-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                <span class="text-sm text-white">Email (SMTP) configured</span>
+                {% else %}
+                <svg class="w-5 h-5 text-yellow-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01"/></svg>
+                <span class="text-sm text-dark-300">Email not configured &mdash; <a href="/setup?step=2" class="text-blue-400 underline">set up</a></span>
+                {% endif %}
+            </div>
+            <div class="flex items-center gap-3 p-3 rounded bg-dark-800">
+                {% if setup_status.has_profiles %}
+                <svg class="w-5 h-5 text-green-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                <span class="text-sm text-white">Profile created</span>
+                {% else %}
+                <svg class="w-5 h-5 text-yellow-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01"/></svg>
+                <span class="text-sm text-dark-300">No profiles &mdash; <a href="/setup?step=3" class="text-blue-400 underline">create one</a></span>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="callout mb-6">
+            <div class="text-sm font-semibold text-blue-300 mb-1">Next Steps</div>
+            <ul class="text-sm text-dark-200 space-y-1 list-disc list-inside">
+                <li>Run a <a href="/accounts" class="text-blue-400 underline">quick account search</a> to see where you're exposed</li>
+                <li>Run a <a href="/scans" class="text-blue-400 underline">full scan</a> across all scanners</li>
+                <li>Send <a href="/removals" class="text-blue-400 underline">opt-out requests</a> to data brokers</li>
+            </ul>
+        </div>
+
+        <div class="text-center">
+            <form method="post" action="/setup/complete">
+                <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+                <button type="submit" class="btn-primary px-8 py-2">Go to Dashboard</button>
+            </form>
+        </div>
+    </div>
+    {% endif %}
+
+</div>
+{% endblock %}

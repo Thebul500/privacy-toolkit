@@ -170,6 +170,34 @@ class Config:
         )
 
 
+def is_setup_complete() -> dict[str, bool]:
+    """Check which setup steps are done.
+
+    Returns a dict with individual checks and an ``all_complete`` flag so
+    the setup wizard can show which steps still need attention.
+    """
+    config_exists = DEFAULT_CONFIG.exists()
+
+    has_profiles = bool(
+        PROFILES_DIR.exists() and list(PROFILES_DIR.glob("*.yaml"))
+    )
+
+    smtp_configured = False
+    if config_exists:
+        try:
+            cfg = Config.load()
+            smtp_configured = bool(cfg.smtp.username and cfg.smtp.password)
+        except Exception:
+            pass
+
+    return {
+        "config_exists": config_exists,
+        "has_profiles": has_profiles,
+        "smtp_configured": smtp_configured,
+        "all_complete": config_exists and has_profiles and smtp_configured,
+    }
+
+
 def load_profile(name: str) -> Profile:
     path = validate_safe_name(name, PROFILES_DIR, "profile")
     if not path.exists():

@@ -60,7 +60,11 @@ def app_client():
     with patch.object(app_module, "list_profiles", return_value=["alice"]), \
          patch.object(app_module, "load_profile", return_value=profile_mock) as mock_load, \
          patch.object(app_module, "load_all_brokers", return_value=[]), \
-         patch.object(app_module, "calculate_score", return_value=mock_score):
+         patch.object(app_module, "calculate_score", return_value=mock_score), \
+         patch.object(app_module, "is_setup_complete", return_value={
+             "config_exists": True, "has_profiles": True,
+             "smtp_configured": True, "all_complete": True,
+         }):
         client = TestClient(app_module.app, raise_server_exceptions=False)
         # Expose mocks for assertions
         client._mock_db = mock_db

@@ -88,6 +88,14 @@
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
                     Activity
                 </a>
+                {% if setup_needed is defined and setup_needed %}
+                <div class="mt-2 pt-2 border-t border-dark-600">
+                    <a href="/setup" onclick="closeSidebar()" class="nav-link flex items-center gap-2.5 px-3 py-2 rounded-md text-sm transition-colors text-yellow-400 hover:text-yellow-300">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
+                        Setup Required
+                    </a>
+                </div>
+                {% endif %}
             </div>
             <div class="px-4 py-3 border-t border-dark-600 text-xs text-dark-300">
                 v1.0 &middot; Web Dashboard
