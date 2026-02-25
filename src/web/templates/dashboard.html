@@ -34,6 +34,21 @@
                 <span class="text-5xl font-bold {{ text_class }}">{{ ps.score }}</span>
                 <span class="text-dark-300 text-lg">/&nbsp;100</span>
                 <span class="ml-2 text-3xl font-bold {{ text_class }}">{{ ps.grade }}</span>
+                {% if score_trend %}
+                {% if score_trend.direction == 'up' %}
+                <span class="ml-3 text-sm text-green-400" title="Score trending up">&#9650;
+                    {% if score_trend['7d_change'] != 0 %}+{{ score_trend['7d_change'] }} in 7d{% endif %}
+                    {% if score_trend['30d_change'] != 0 %}, +{{ score_trend['30d_change'] }} in 30d{% endif %}
+                </span>
+                {% elif score_trend.direction == 'down' %}
+                <span class="ml-3 text-sm text-red-400" title="Score trending down">&#9660;
+                    {{ score_trend['7d_change'] }} in 7d
+                    {% if score_trend['30d_change'] != 0 %}, {{ score_trend['30d_change'] }} in 30d{% endif %}
+                </span>
+                {% else %}
+                <span class="ml-3 text-sm text-dark-300" title="Score stable">&#9644; stable</span>
+                {% endif %}
+                {% endif %}
             </div>
         </div>
         <div class="text-right text-sm text-dark-300 space-y-1 hidden md:block">
@@ -135,6 +150,23 @@
         </div>
     </div>
 </div>
+
+<!-- PDF Reports -->
+{% if stats.findings > 0 or stats.removals_submitted > 0 %}
+<div class="card p-5 mb-8">
+    <h3 class="text-sm font-semibold text-white mb-3">Download Reports</h3>
+    <div class="flex gap-3">
+        {% if stats.findings > 0 %}
+        <a href="/reports/pdf/findings{% if score_profile %}?profile={{ score_profile }}{% endif %}"
+           class="btn-primary text-xs px-3 py-1.5">Findings PDF</a>
+        {% endif %}
+        {% if stats.removals_submitted > 0 %}
+        <a href="/reports/pdf/removals{% if score_profile %}?profile={{ score_profile }}{% endif %}"
+           class="btn-primary bg-dark-600 hover:bg-dark-500 text-xs px-3 py-1.5">Removals PDF</a>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
 
 <!-- Recent Activity -->
 <div class="card">

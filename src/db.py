@@ -72,6 +72,15 @@ CREATE INDEX IF NOT EXISTS idx_findings_site ON findings(site_name);
 CREATE INDEX IF NOT EXISTS idx_removal_status ON removal_requests(status);
 CREATE INDEX IF NOT EXISTS idx_removal_profile ON removal_requests(profile);
 CREATE INDEX IF NOT EXISTS idx_scans_profile ON scans(profile);
+
+CREATE TABLE IF NOT EXISTS score_history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    profile TEXT NOT NULL,
+    score INTEGER NOT NULL,
+    grade TEXT NOT NULL,
+    details TEXT DEFAULT '{}',
+    calculated_at TEXT DEFAULT (datetime('now'))
+);
 """
 
 
@@ -105,6 +114,18 @@ class Database:
         try:
             conn = self._connect()
             conn.executescript(SCHEMA)
+            # One-time dedup cleanup: keep lowest-ID row per unique group,
+            # then create unique index (must dedup before index creation)
+            conn.execute("""
+                DELETE FROM findings WHERE id NOT IN (
+                    SELECT MIN(id) FROM findings
+                    GROUP BY profile, source, site_name, site_url, data_type
+                )
+            """)
+            conn.execute("""
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_findings_unique
+                ON findings(profile, source, site_name, site_url, data_type)
+            """)
             conn.commit()
             conn.close()
         except sqlite3.Error as e:
@@ -172,13 +193,21 @@ class Database:
     ) -> int:
         conn = self._connect()
         cur = conn.execute(
-            """INSERT INTO findings
+            """INSERT OR IGNORE INTO findings
             (scan_id, profile, source, site_name, site_url, data_type, details, confidence, found_at)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (scan_id, profile, source, site_name, site_url, data_type,
              json.dumps(details or {}), confidence, _now()),
         )
         fid = cur.lastrowid
+        if fid == 0 or cur.rowcount == 0:
+            # Row already exists — fetch its ID
+            row = conn.execute(
+                """SELECT id FROM findings
+                WHERE profile=? AND source=? AND site_name=? AND site_url=? AND data_type=?""",
+                (profile, source, site_name, site_url, data_type),
+            ).fetchone()
+            fid = row["id"] if row else 0
         conn.commit()
         conn.close()
         return fid
@@ -400,6 +429,28 @@ class Database:
             query += " AND profile=?"
             params.append(profile)
         rows = conn.execute(query, params).fetchall()
+        conn.close()
+        return [dict(r) for r in rows]
+
+    # --- Score History ---
+
+    def save_score(self, profile: str, score: int, grade: str, details: Optional[dict] = None) -> int:
+        conn = self._connect()
+        cur = conn.execute(
+            "INSERT INTO score_history (profile, score, grade, details, calculated_at) VALUES (?, ?, ?, ?, ?)",
+            (profile, score, grade, json.dumps(details or {}), _now()),
+        )
+        sid = cur.lastrowid
+        conn.commit()
+        conn.close()
+        return sid
+
+    def get_score_history(self, profile: str, limit: int = 90) -> list[dict]:
+        conn = self._connect()
+        rows = conn.execute(
+            "SELECT * FROM score_history WHERE profile=? ORDER BY id DESC LIMIT ?",
+            (profile, limit),
+        ).fetchall()
         conn.close()
         return [dict(r) for r in rows]
 

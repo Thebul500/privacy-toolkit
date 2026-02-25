@@ -3,6 +3,7 @@
 from __future__ import annotations
 import asyncio
 import logging
+import random
 import re
 from datetime import datetime
 from typing import TYPE_CHECKING, Optional
@@ -14,6 +15,20 @@ if TYPE_CHECKING:
 from src.scanners.base import BaseScanner
 
 logger = logging.getLogger(__name__)
+
+# Realistic user agents for rotation — reduces fingerprinting
+USER_AGENTS = [
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:122.0) Gecko/20100101 Firefox/122.0",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:122.0) Gecko/20100101 Firefox/122.0",
+    "Mozilla/5.0 (X11; Linux x86_64; rv:122.0) Gecko/20100101 Firefox/122.0",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36 Edg/121.0.0.0",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Safari/605.1.15",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+]
 
 # Each broker entry: (name, search_url_template, result_indicator_selector, listing_url_pattern)
 PEOPLE_SEARCH_SITES = [
@@ -27,6 +42,8 @@ PEOPLE_SEARCH_SITES = [
         "search_by_address": "/address/{street}_{city}-{state}-{zip}",
         "result_selector": "a.btn-primary[href*='/address/'], .card-block .detail-box-name",
         "no_result_text": "did not return any results",
+        "fallback_selector": ".detail-box-phone, .card-block a[href*='/name/']",
+        "content_patterns": [r"\d+ records? found", r"Age \d+"],
     },
     {
         "name": "TruePeopleSearch",
@@ -38,6 +55,8 @@ PEOPLE_SEARCH_SITES = [
         "search_by_address": "/results?streetaddress={street}&citystatezip={city}+{state}+{zip}",
         "result_selector": ".card-summary .h4, .card-summary a[href*='/find/person/']",
         "no_result_text": "No results found",
+        "fallback_selector": ".card-summary .content-value, a.btn[href*='/find/']",
+        "content_patterns": [r"\d+ records? found", r"Lives in"],
     },
     {
         "name": "Whitepages",
@@ -49,6 +68,8 @@ PEOPLE_SEARCH_SITES = [
         "search_by_address": "/address/{street}/{city}-{state}-{zip}",
         "result_selector": "a[href*='/person/'], .serp-results .person-name",
         "no_result_text": "We couldn't find",
+        "fallback_selector": ".serp-results a, .people-results .name",
+        "content_patterns": [r"\d+ results?", r"Age \d+"],
     },
     {
         "name": "Spokeo",
@@ -60,6 +81,8 @@ PEOPLE_SEARCH_SITES = [
         "search_by_address": "/address-search/search?q={street}+{city}+{state}+{zip}",
         "result_selector": "a[data-link*='search-result'], .result-item .result-name",
         "no_result_text": "We could not find results",
+        "fallback_selector": ".result-item a, .search-result-card",
+        "content_patterns": [r"\d+ results?", r"Lives in"],
     },
     # --- Additional people-search sites ---
     {
@@ -332,13 +355,24 @@ async def scan_single(profile: "Profile", slug: str) -> list[ScanResult]:
     results: list[ScanResult] = []
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
-        context = await browser.new_context(
-            user_agent=(
-                "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
-                "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-            ),
-            viewport={"width": 1920, "height": 1080},
-        )
+        context_kwargs: dict = {
+            "user_agent": random.choice(USER_AGENTS),
+            "viewport": {"width": 1920, "height": 1080},
+        }
+        # Proxy support via BrowserConfig
+        try:
+            from src.config import Config
+            cfg = Config.load()
+            if cfg.browser.proxy.server:
+                proxy = {"server": cfg.browser.proxy.server}
+                if cfg.browser.proxy.username:
+                    proxy["username"] = cfg.browser.proxy.username
+                if cfg.browser.proxy.password:
+                    proxy["password"] = cfg.browser.proxy.password
+                context_kwargs["proxy"] = proxy
+        except Exception:
+            pass
+        context = await browser.new_context(**context_kwargs)
         context.set_default_timeout(30000)
 
         for query, query_type in queries:
@@ -391,8 +425,9 @@ def _normalize_state(state: str) -> str:
 class PeopleSearchScanner(BaseScanner):
     name = "people_search"
 
-    def __init__(self, rate_limit_delay: float = 2.0):
+    def __init__(self, rate_limit_delay: float = 2.0, proxy: Optional[dict] = None):
         self.rate_limit_delay = rate_limit_delay
+        self._proxy = proxy  # {"server": ..., "username": ..., "password": ...}
 
     def is_available(self) -> bool:
         try:
@@ -426,20 +461,22 @@ class PeopleSearchScanner(BaseScanner):
         results = []
         async with async_playwright() as p:
             browser = await p.chromium.launch(headless=True)
-            context = await browser.new_context(
-                user_agent=(
-                    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
-                    "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-                ),
-                viewport={"width": 1920, "height": 1080},
-            )
+            context_kwargs: dict = {
+                "user_agent": random.choice(USER_AGENTS),
+                "viewport": {"width": 1920, "height": 1080},
+            }
+            if self._proxy:
+                context_kwargs["proxy"] = self._proxy
+            context = await browser.new_context(**context_kwargs)
             context.set_default_timeout(30000)
 
             for i, site in enumerate(PEOPLE_SEARCH_SITES):
-                # Rate limit: delay between site checks to avoid IP blocking
+                # Rate limit with jitter to avoid IP blocking
                 if i > 0 and self.rate_limit_delay > 0:
-                    logger.debug("Rate limiting: sleeping %.1fs before checking %s", self.rate_limit_delay, site.get("name", "unknown"))
-                    await asyncio.sleep(self.rate_limit_delay)
+                    jitter = self.rate_limit_delay + random.uniform(-0.5, 1.5)
+                    jitter = max(0.5, jitter)  # never below 0.5s
+                    logger.debug("Rate limiting: sleeping %.1fs before checking %s", jitter, site.get("name", "unknown"))
+                    await asyncio.sleep(jitter)
                 try:
                     result = await self._check_site(context, site, query, query_type)
                     if result:
@@ -497,6 +534,31 @@ class PeopleSearchScanner(BaseScanner):
                             listing_url = href
             except Exception as e:
                 logger.debug("Selector query failed for site=%s: %s", site.get("name", "unknown"), e)
+
+            # Fallback: try alternate selector if primary found nothing but page has content
+            if not found and len(page_text) > 500:
+                fallback_sel = site.get("fallback_selector", "")
+                if fallback_sel:
+                    try:
+                        fb_elements = await page.query_selector_all(fallback_sel)
+                        if fb_elements:
+                            found = True
+                            first = fb_elements[0]
+                            href = await first.get_attribute("href")
+                            if href:
+                                if href.startswith("/"):
+                                    listing_url = site["base_url"] + href
+                                elif href.startswith("http"):
+                                    listing_url = href
+                    except Exception as e:
+                        logger.debug("Fallback selector failed for site=%s: %s", site.get("name", "unknown"), e)
+
+                # Content pattern fallback
+                if not found:
+                    for pattern in site.get("content_patterns", []):
+                        if re.search(pattern, page_text, re.IGNORECASE):
+                            found = True
+                            break
 
             if not found:
                 return None
@@ -580,3 +642,67 @@ class PeopleSearchScanner(BaseScanner):
         elif query_type == "address":
             return self._build_address_url(site, query)
         return None
+
+
+async def check_selector_health() -> list[dict]:
+    """Test each site's CSS selector against a neutral search.
+
+    Returns a list of dicts: [{"site": name, "status": "ok"|"broken"|"timeout", "error": str}]
+    """
+    from playwright.async_api import async_playwright
+
+    results = []
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(headless=True)
+        context = await browser.new_context(
+            user_agent=random.choice(USER_AGENTS),
+            viewport={"width": 1920, "height": 1080},
+        )
+        context.set_default_timeout(15000)
+
+        scanner = PeopleSearchScanner()
+        for site in PEOPLE_SEARCH_SITES:
+            name = site["name"]
+            status_entry = {"site": name, "status": "ok", "error": ""}
+            try:
+                url = scanner._build_name_url(site, "John Smith")
+                if not url:
+                    status_entry["status"] = "broken"
+                    status_entry["error"] = "No name search URL template"
+                    results.append(status_entry)
+                    continue
+
+                page = await context.new_page()
+                try:
+                    response = await page.goto(url, wait_until="domcontentloaded", timeout=10000)
+                    if not response or response.status >= 400:
+                        status_entry["status"] = "broken"
+                        status_entry["error"] = f"HTTP {response.status if response else 'no response'}"
+                    else:
+                        await page.wait_for_timeout(1500)
+                        elements = await page.query_selector_all(site["result_selector"])
+                        if not elements:
+                            # Check if page has content at all
+                            text = await page.inner_text("body")
+                            if len(text) < 100:
+                                status_entry["status"] = "broken"
+                                status_entry["error"] = "Page appears empty"
+                            else:
+                                status_entry["status"] = "broken"
+                                status_entry["error"] = "Selector returned 0 elements"
+                finally:
+                    await page.close()
+            except asyncio.TimeoutError:
+                status_entry["status"] = "timeout"
+                status_entry["error"] = "Page load timed out"
+            except Exception as e:
+                status_entry["status"] = "broken"
+                status_entry["error"] = str(e)[:100]
+            results.append(status_entry)
+
+            # Brief delay between checks
+            await asyncio.sleep(1.0)
+
+        await browser.close()
+
+    return results

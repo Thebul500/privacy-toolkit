@@ -131,6 +131,18 @@ def _scheduled_scan(profile_name: str, config: "Config", db: "Database",
     )
 
 
+def _scheduled_verification(profile_name: str, config: "Config", db: "Database",
+                            task_manager: "TaskManager") -> None:
+    """Called by APScheduler to run verification scans."""
+    from src.tasks import run_verification_scans
+    logger.info("Scheduled verification scan starting for profile: %s", profile_name)
+    task_manager.submit(
+        f"Verification scan: {profile_name}",
+        run_verification_scans, profile_name, config, db,
+        profile=profile_name,
+    )
+
+
 def _scheduled_follow_ups(config: "Config", db: "Database",
                           task_manager: "TaskManager") -> None:
     """Check for overdue removals and send follow-up emails."""
@@ -186,6 +198,18 @@ def setup_apscheduler(config: "Config", db: "Database",
             name=f"Daily recheck: {profile_name}",
             replace_existing=True,
         )
+
+    # Daily verification scans at 11 AM
+    for profile_name in profiles:
+        scheduler.add_job(
+            _scheduled_verification,
+            CronTrigger(hour=11, minute=0),
+            args=[profile_name, config, db, task_manager],
+            id=f"verify_{profile_name}",
+            name=f"Daily verification: {profile_name}",
+            replace_existing=True,
+        )
+    logger.info("Scheduled daily verification scans at 11 AM")
 
     # Daily follow-up check at 10 AM for overdue removals
     scheduler.add_job(

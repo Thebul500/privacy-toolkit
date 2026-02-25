@@ -1375,6 +1375,29 @@ def track_reappeared(ctx, removal_id):
     console.print(f"[yellow]Removal #{removal_id} marked as reappeared. Re-submit removal.[/yellow]")
 
 
+@track.command("verify")
+@click.pass_context
+def track_verify(ctx):
+    """Run verification scans on removals past their recheck date."""
+    from src.tasks import run_verification_scans
+    config = ctx.obj["config"]
+    db = ctx.obj["db"]
+    profile_name = ctx.obj["profile_name"]
+
+    if not profile_name:
+        profiles = list_profiles()
+        if not profiles:
+            console.print("[red]No profiles found. Create one first.[/red]")
+            return
+        profile_name = profiles[0]
+
+    console.print(f"[blue]Running verification scans for {profile_name}...[/blue]")
+    result = run_verification_scans(profile_name, config, db)
+    console.print(f"[green]Verified: {result['verified']} | "
+                  f"Confirmed: {result['confirmed']} | "
+                  f"Reappeared: {result['reappeared']}[/green]")
+
+
 @track.command("bounces")
 @click.pass_context
 def track_bounces(ctx):
@@ -1520,7 +1543,7 @@ def score(ctx):
 # ============================================================================
 
 @cli.command("report")
-@click.option("--format", "-f", "fmt", type=click.Choice(["table", "json", "csv", "html"]), default="table")
+@click.option("--format", "-f", "fmt", type=click.Choice(["table", "json", "csv", "html", "pdf"]), default="table")
 @click.option("--output", "-o", default=None, help="Output file path")
 @click.option("--type", "-t", "report_type", type=click.Choice(["findings", "removals"]), default="findings",
               help="Report type: findings or removals")
@@ -1556,6 +1579,13 @@ def report(ctx, fmt, output, report_type):
             path = export_findings(db, profile_name, output)
         else:
             path = export_removals(db, profile_name, output)
+        console.print(f"[green]Exported to: {path}[/green]")
+    elif fmt == "pdf":
+        from src.reporting.pdf_export import export_findings_pdf, export_removals_pdf
+        if report_type == "findings":
+            path = export_findings_pdf(db, profile_name, output)
+        else:
+            path = export_removals_pdf(db, profile_name, output)
         console.print(f"[green]Exported to: {path}[/green]")
 
 
@@ -1981,9 +2011,18 @@ def setup(ctx):
 # DOCTOR COMMAND
 # ============================================================================
 
-@cli.command("doctor")
+@cli.group(invoke_without_command=True)
 @click.pass_context
 def doctor(ctx):
+    """Check dependencies and system health."""
+    if ctx.invoked_subcommand is not None:
+        return
+    ctx.invoke(doctor_deps)
+
+
+@doctor.command("deps")
+@click.pass_context
+def doctor_deps(ctx):
     """Check all dependencies and report their status."""
     from src.config import BIN_DIR
 
@@ -2234,6 +2273,43 @@ def doctor(ctx):
     console.print()
     console.print(table)
     console.print()
+
+
+@doctor.command("check-selectors")
+@click.pass_context
+def doctor_check_selectors(ctx):
+    """Test CSS selectors against all configured people-search sites."""
+    from src.scanners.people_search_scanner import check_selector_health
+
+    console.print("[blue]Checking CSS selectors for all people-search sites...[/blue]")
+    console.print("[dim]This uses a neutral 'John Smith' search and may take a few minutes.[/dim]\n")
+
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        results = loop.run_until_complete(check_selector_health())
+    finally:
+        loop.close()
+
+    table = Table(title="Selector Health Check")
+    table.add_column("Site", style="bold", width=28)
+    table.add_column("Status", width=10)
+    table.add_column("Details")
+
+    ok_count = 0
+    for r in results:
+        status = r["status"]
+        if status == "ok":
+            status_text = "[green]OK[/green]"
+            ok_count += 1
+        elif status == "timeout":
+            status_text = "[yellow]TIMEOUT[/yellow]"
+        else:
+            status_text = "[red]BROKEN[/red]"
+        table.add_row(r["site"], status_text, r.get("error", ""))
+
+    console.print(table)
+    console.print(f"\n[bold]{ok_count}/{len(results)} selectors working.[/bold]")
 
 
 def main():

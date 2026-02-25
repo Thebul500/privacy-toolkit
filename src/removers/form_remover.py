@@ -2,18 +2,22 @@
 
 from __future__ import annotations
 import logging
+import random
 
 logger = logging.getLogger(__name__)
 
-from src.config import BrowserConfig, DATA_DIR
+from src.config import BrowserConfig, CaptchaConfig, DATA_DIR
 from src.db import Database
 from src.models import Broker, Profile
+from src.scanners.people_search_scanner import USER_AGENTS
 
 
 class FormRemover:
-    def __init__(self, browser_config: BrowserConfig, db: Database):
+    def __init__(self, browser_config: BrowserConfig, db: Database,
+                 captcha_config: CaptchaConfig | None = None):
         self.config = browser_config
         self.db = db
+        self.captcha_config = captcha_config or CaptchaConfig()
         self.screenshots_dir = DATA_DIR / "screenshots"
         self.screenshots_dir.mkdir(parents=True, exist_ok=True)
 
@@ -50,9 +54,18 @@ class FormRemover:
         try:
             async with async_playwright() as p:
                 browser = await p.chromium.launch(headless=headless)
-                context = await browser.new_context(
-                    user_agent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-                )
+                context_kwargs: dict = {
+                    "user_agent": random.choice(USER_AGENTS),
+                }
+                # Proxy passthrough
+                if self.config.proxy.server:
+                    proxy = {"server": self.config.proxy.server}
+                    if self.config.proxy.username:
+                        proxy["username"] = self.config.proxy.username
+                    if self.config.proxy.password:
+                        proxy["password"] = self.config.proxy.password
+                    context_kwargs["proxy"] = proxy
+                context = await browser.new_context(**context_kwargs)
                 page = await context.new_page()
                 page.set_default_timeout(self.config.timeout)
 
@@ -155,6 +168,14 @@ class FormRemover:
 
         elif step.action == "click":
             await page.click(step.selector)
+            # After clicks, attempt CAPTCHA solving if configured
+            if self.captcha_config.provider != "none":
+                try:
+                    from src.captcha_solver import CaptchaSolver
+                    solver = CaptchaSolver(self.captcha_config)
+                    await solver.detect_and_solve(page)
+                except Exception as e:
+                    logger.debug("CAPTCHA check after click: %s", e)
 
         elif step.action == "wait":
             await page.wait_for_timeout(step.duration or 2000)
@@ -162,6 +183,17 @@ class FormRemover:
         elif step.action == "screenshot":
             path = self.screenshots_dir / f"{broker.slug}_{step.name or 'step'}.png"
             await page.screenshot(path=str(path))
+
+        elif step.action == "solve_captcha":
+            if self.captcha_config.provider != "none":
+                try:
+                    from src.captcha_solver import CaptchaSolver
+                    solver = CaptchaSolver(self.captcha_config)
+                    solved = await solver.detect_and_solve(page)
+                    if not solved:
+                        logger.warning("CAPTCHA not solved for broker=%s", broker.slug)
+                except Exception as e:
+                    logger.error("CAPTCHA solve failed for broker=%s: %s", broker.slug, e)
 
     def _resolve_field(self, field: str, static_value: str, profile: Profile) -> str:
         if static_value:

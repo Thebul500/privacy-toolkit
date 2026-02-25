@@ -92,11 +92,19 @@ class ScheduleConfig:
 
 
 @dataclass
+class ProxyConfig:
+    server: str = ""        # e.g. "http://proxy:8080" or "socks5://proxy:1080"
+    username: str = ""
+    password: str = ""
+
+
+@dataclass
 class BrowserConfig:
     headless: bool = True
     timeout: int = 30000
     screenshot_on_submit: bool = True
     rate_limit_delay: float = 2.0
+    proxy: ProxyConfig = field(default_factory=ProxyConfig)
 
 
 @dataclass
@@ -106,12 +114,28 @@ class WebConfig:
 
 
 @dataclass
+class WebhookConfig:
+    enabled: bool = False
+    url: str = ""
+    headers: dict[str, str] = field(default_factory=dict)
+
+
+@dataclass
+class CaptchaConfig:
+    provider: str = "none"   # "none", "2captcha", "capsolver"
+    api_key: str = ""
+    timeout: int = 120       # max seconds to wait for solve
+
+
+@dataclass
 class Config:
     smtp: SmtpConfig = field(default_factory=SmtpConfig)
     signal: SignalConfig = field(default_factory=SignalConfig)
     schedule: ScheduleConfig = field(default_factory=ScheduleConfig)
     browser: BrowserConfig = field(default_factory=BrowserConfig)
     web: WebConfig = field(default_factory=WebConfig)
+    webhook: WebhookConfig = field(default_factory=WebhookConfig)
+    captcha: CaptchaConfig = field(default_factory=CaptchaConfig)
     db_path: str = "data/privacy_toolkit.db"
     log_level: str = "INFO"
     hibp_api_key: str = ""
@@ -129,6 +153,9 @@ class Config:
         sched_data = data.get("scheduling", {})
         browser_data = data.get("browser", {})
         web_data = data.get("web", {})
+        webhook_data = data.get("webhook", {})
+        captcha_data = data.get("captcha", {})
+        proxy_data = browser_data.get("proxy", {})
 
         return cls(
             smtp=SmtpConfig(
@@ -159,10 +186,25 @@ class Config:
                 timeout=browser_data.get("timeout", 30000),
                 screenshot_on_submit=browser_data.get("screenshot_on_submit", True),
                 rate_limit_delay=float(browser_data.get("rate_limit_delay", 2.0)),
+                proxy=ProxyConfig(
+                    server=_resolve_env(proxy_data.get("server", ""), "PROXY_URL"),
+                    username=_resolve_env(proxy_data.get("username", ""), "PROXY_USER"),
+                    password=_resolve_env(proxy_data.get("password", ""), "PROXY_PASS"),
+                ),
             ),
             web=WebConfig(
                 host=web_data.get("host", "0.0.0.0"),  # nosec B104
                 port=web_data.get("port", 8080),
+            ),
+            webhook=WebhookConfig(
+                enabled=webhook_data.get("enabled", False),
+                url=_resolve_env(webhook_data.get("url", ""), "WEBHOOK_URL"),
+                headers=webhook_data.get("headers", {}),
+            ),
+            captcha=CaptchaConfig(
+                provider=captcha_data.get("provider", "none"),
+                api_key=_resolve_env(captcha_data.get("api_key", ""), "CAPTCHA_API_KEY"),
+                timeout=captcha_data.get("timeout", 120),
             ),
             db_path=data.get("database", {}).get("path", "data/privacy_toolkit.db"),
             log_level=data.get("logging", {}).get("level", "INFO"),

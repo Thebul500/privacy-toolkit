@@ -27,7 +27,7 @@ from src.config import (
 )
 from src.db import Database
 from src.models import Profile
-from src.scoring import calculate_score
+from src.scoring import calculate_score, get_trend
 from src.tasks import TaskManager, TaskStatus, run_email_removals, run_full_scan
 
 GUIDES_DIR = TOOLKIT_DIR / "guides"
@@ -82,7 +82,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         return response
 
 
-from src.auth import APIKeyMiddleware, PasswordAuthMiddleware, _password_hash
+from src.auth import APIKeyMiddleware, PasswordAuthMiddleware, create_session, destroy_session
 from src.csrf import CSRFMiddleware
 app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(CSRFMiddleware)
@@ -129,10 +129,12 @@ async def dashboard(request: Request):
     # Calculate privacy score for first profile (if any)
     privacy_score = None
     score_profile = None
+    score_trend = None
     if profiles_list:
         score_profile = profiles_list[0]
         try:
             privacy_score = calculate_score(db, score_profile)
+            score_trend = get_trend(db, score_profile)
         except Exception as e:
             logger.warning("Failed to calculate privacy score for %s: %s", score_profile, e)
 
@@ -151,6 +153,7 @@ async def dashboard(request: Request):
         active_tasks=active,
         privacy_score=privacy_score,
         score_profile=score_profile,
+        score_trend=score_trend,
     ))
 
 
@@ -780,6 +783,26 @@ async def verify_broker_listing(request: Request, slug: str, profile: str = Form
     )
 
 
+@app.get("/reports/pdf/{report_type}")
+async def download_pdf(report_type: str, profile: Optional[str] = None):
+    """Generate and download a PDF report."""
+    from fastapi.responses import FileResponse
+    from src.reporting.pdf_export import export_findings_pdf, export_removals_pdf
+
+    if report_type == "findings":
+        path = export_findings_pdf(db, profile)
+    elif report_type == "removals":
+        path = export_removals_pdf(db, profile)
+    else:
+        return RedirectResponse("/", status_code=303)
+
+    return FileResponse(
+        path,
+        media_type="application/pdf",
+        filename=f"privacy_toolkit_{report_type}.pdf",
+    )
+
+
 @app.get("/activity", response_class=HTMLResponse)
 async def activity_page(request: Request):
     entries = db.get_audit_log(limit=200)
@@ -934,7 +957,7 @@ async def login_submit(password: str = Form(...)):
         return RedirectResponse(
             "/login?error=Invalid+password", status_code=303
         )
-    token = _password_hash(password)
+    token = create_session(password)
     response = RedirectResponse("/", status_code=303)
     response.set_cookie(
         "_ptk_session", token,
@@ -942,6 +965,16 @@ async def login_submit(password: str = Form(...)):
         samesite="strict",
         path="/",
     )
+    return response
+
+
+@app.get("/logout")
+async def logout(request: Request):
+    cookie = request.cookies.get("_ptk_session", "")
+    if cookie:
+        destroy_session(cookie)
+    response = RedirectResponse("/login", status_code=303)
+    response.delete_cookie("_ptk_session", path="/")
     return response
 
 

@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 from dataclasses import dataclass, field
+from datetime import datetime, timedelta
 
 logger = logging.getLogger(__name__)
 
@@ -168,7 +169,7 @@ def calculate_score(db, profile: str) -> PrivacyScore:
             "Continue periodic scans to detect new exposures"
         )
 
-    return PrivacyScore(
+    result = PrivacyScore(
         score=score,
         grade=grade,
         findings_count=len(findings),
@@ -180,3 +181,57 @@ def calculate_score(db, profile: str) -> PrivacyScore:
         risk_factors=risk_factors,
         recommendations=recommendations,
     )
+
+    # Persist score to history
+    try:
+        db.save_score(profile, score, grade, {
+            "findings": len(findings),
+            "breaches": len(breaches),
+            "broker_listings": len(broker_listings),
+            "accounts": len(accounts),
+            "removals_confirmed": len(confirmed_removals),
+            "removals_pending": len(pending_removals),
+        })
+    except Exception as e:
+        logger.warning("Failed to save score history for %s: %s", profile, e)
+
+    return result
+
+
+def get_trend(db, profile: str) -> dict:
+    """Calculate score trend over 7 and 30 days.
+
+    Returns: {"7d_change": int, "30d_change": int, "direction": "up"|"down"|"stable"}
+    """
+    history = db.get_score_history(profile, limit=90)
+    if not history:
+        return {"7d_change": 0, "30d_change": 0, "direction": "stable"}
+
+    current_score = history[0]["score"]
+    now = datetime.now()
+
+    def _find_score_at(days_ago: int) -> int | None:
+        target = now - timedelta(days=days_ago)
+        for entry in history:
+            try:
+                entry_date = datetime.fromisoformat(entry["calculated_at"])
+            except (ValueError, TypeError):
+                continue
+            if entry_date <= target:
+                return entry["score"]
+        return None
+
+    score_7d = _find_score_at(7)
+    score_30d = _find_score_at(30)
+
+    change_7d = (current_score - score_7d) if score_7d is not None else 0
+    change_30d = (current_score - score_30d) if score_30d is not None else 0
+
+    if change_7d > 0:
+        direction = "up"
+    elif change_7d < 0:
+        direction = "down"
+    else:
+        direction = "stable"
+
+    return {"7d_change": change_7d, "30d_change": change_30d, "direction": direction}

@@ -89,7 +89,6 @@ class TaskManager:
 def run_full_scan(profile_name: str, config, db) -> dict:
     """Run a full scan for a profile. Reuses the same logic as cli.py scan_full."""
     from src.config import load_profile
-    from src.notifications import send_signal
 
     profile = load_profile(profile_name)
     total = 0
@@ -253,12 +252,14 @@ def run_full_scan(profile_name: str, config, db) -> dict:
     except ImportError:
         pass
 
-    # Notify
-    if config.signal.enabled:
-        send_signal(
-            f"Privacy Toolkit: Full scan complete for {profile_name}. {total} exposures found.",
-            config.signal,
-        )
+    # Notify via all channels
+    from src.notifications import notify
+    notify(
+        "scan_complete",
+        f"Privacy Toolkit: Full scan complete for {profile_name}. {total} exposures found.",
+        config,
+        details={"profile": profile_name, "total_findings": total},
+    )
 
     db.log("full_scan_complete", profile_name, {"total_findings": total})
     return {"profile": profile_name, "total_findings": total}
@@ -296,7 +297,7 @@ def run_form_removal(profile_name: str, broker_slug: str, config, db) -> dict:
 
     profile = load_profile(profile_name)
     broker = load_broker(broker_slug)
-    remover = FormRemover(config.browser, db)
+    remover = FormRemover(config.browser, db, captcha_config=config.captcha)
 
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
@@ -337,6 +338,66 @@ def run_url_discovery(profile_name: str, broker_slug: str, config, db) -> dict:
     urls = [f.site_url for f in findings if f.site_url]
     db.log("url_discovery", profile_name, {"broker": broker_slug, "urls": urls})
     return {"broker": broker_slug, "found": len(findings), "urls": urls}
+
+
+def run_verification_scans(profile_name: str, config, db) -> dict:
+    """Re-scan brokers with submitted removals past recheck_at to verify deletion."""
+    from src.config import load_profile
+    from src.notifications import notify
+    from src.scanners.people_search_scanner import has_scanner_config, scan_single
+
+    pending = db.get_pending_rechecks(profile=profile_name)
+    if not pending:
+        logger.info("No pending rechecks for profile %s", profile_name)
+        return {"verified": 0, "confirmed": 0, "reappeared": 0}
+
+    profile = load_profile(profile_name)
+    confirmed = 0
+    reappeared = 0
+
+    for removal in pending:
+        broker_slug = removal["broker_slug"]
+        removal_id = removal["id"]
+
+        if not has_scanner_config(broker_slug):
+            logger.debug("No scanner config for %s, skipping verification", broker_slug)
+            continue
+
+        try:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                findings = loop.run_until_complete(scan_single(profile, broker_slug))
+            finally:
+                loop.close()
+
+            if not findings:
+                # Listing gone — confirmed removal
+                db.update_removal_status(removal_id, "confirmed",
+                                         notes="Auto-verified: listing removed")
+                confirmed += 1
+                logger.info("Verified removal confirmed for %s on %s", profile_name, broker_slug)
+            else:
+                # Listing still there — reappeared
+                db.update_removal_status(removal_id, "confirmed")  # must go through confirmed first
+                db.update_removal_status(removal_id, "reappeared",
+                                         notes="Auto-verified: listing still present")
+                reappeared += 1
+                logger.warning("Listing reappeared for %s on %s", profile_name, broker_slug)
+                notify(
+                    "removal_reappeared",
+                    f"Privacy Toolkit: Listing reappeared for {profile_name} on {broker_slug}",
+                    config,
+                    details={"profile": profile_name, "broker": broker_slug},
+                )
+        except Exception as e:
+            logger.error("Verification scan failed for %s/%s: %s", profile_name, broker_slug, e)
+
+    verified = confirmed + reappeared
+    db.log("verification_scans", profile_name, {
+        "verified": verified, "confirmed": confirmed, "reappeared": reappeared,
+    })
+    return {"verified": verified, "confirmed": confirmed, "reappeared": reappeared}
 
 
 def run_follow_ups(config, db) -> dict:
