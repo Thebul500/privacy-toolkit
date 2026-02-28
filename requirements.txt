@@ -9,6 +9,7 @@ holehe>=1.61
 sherlock-project>=0.15
 maigret>=0.4
 playwright>=1.40
+playwright-stealth>=1.0.6
 fastapi>=0.109
 uvicorn[standard]>=0.27
 apscheduler>=3.10

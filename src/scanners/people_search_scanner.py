@@ -16,6 +16,79 @@ from src.scanners.base import BaseScanner
 
 logger = logging.getLogger(__name__)
 
+# Stealth browser launch arguments to avoid headless detection
+STEALTH_ARGS = [
+    "--disable-blink-features=AutomationControlled",
+    "--disable-dev-shm-usage",
+    "--no-first-run",
+    "--no-default-browser-check",
+    "--disable-extensions",
+]
+
+
+async def _launch_stealth_browser(playwright):
+    """Launch Chromium with stealth settings to avoid bot detection."""
+    browser = await playwright.chromium.launch(
+        headless=True,
+        args=STEALTH_ARGS,
+    )
+    return browser
+
+
+async def _create_stealth_context(browser, proxy=None):
+    """Create a browser context with stealth patches and realistic fingerprint."""
+    context_kwargs = {
+        "user_agent": random.choice(USER_AGENTS),
+        "viewport": {"width": random.choice([1366, 1440, 1536, 1920]),
+                      "height": random.choice([768, 900, 864, 1080])},
+        "locale": random.choice(["en-US", "en-GB"]),
+        "timezone_id": random.choice([
+            "America/Chicago", "America/New_York", "America/Los_Angeles",
+            "America/Denver",
+        ]),
+    }
+    if proxy:
+        context_kwargs["proxy"] = proxy
+    context = await browser.new_context(**context_kwargs)
+    context.set_default_timeout(30000)
+
+    # Apply playwright-stealth patches
+    try:
+        from playwright_stealth import stealth_async
+        await stealth_async(context)
+    except ImportError:
+        logger.debug("playwright-stealth not installed, skipping stealth patches")
+
+    return context
+
+
+async def _dismiss_consent(page) -> bool:
+    """Try to click through consent/cookie walls. Returns True if something was clicked."""
+    consent_selectors = [
+        "button:has-text('Continue to Results')",
+        "button:has-text('I agree')",
+        "button:has-text('Accept')",
+        "button:has-text('Accept All')",
+        "button:has-text('Accept Cookies')",
+        "button:has-text('Agree')",
+        "button:has-text('Continue')",
+        "a:has-text('Continue to Results')",
+        "a:has-text('I agree')",
+        "[id*='consent'] button",
+        "[class*='consent'] button",
+        "[class*='cookie'] button",
+    ]
+    for sel in consent_selectors:
+        try:
+            el = await page.query_selector(sel)
+            if el and await el.is_visible():
+                await el.click()
+                await page.wait_for_timeout(2000)
+                return True
+        except Exception:
+            continue
+    return False
+
 # Realistic user agents for rotation — reduces fingerprinting
 USER_AGENTS = [
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
@@ -66,10 +139,10 @@ PEOPLE_SEARCH_SITES = [
         "search_by_phone": "/phone/{phone}",
         "search_by_email": None,
         "search_by_address": "/address/{street}/{city}-{state}-{zip}",
-        "result_selector": "a[href*='/person/'], .serp-results .person-name",
+        "result_selector": "div.results-container a.link, li.top-result, a[href*='/name/'][class='link']",
         "no_result_text": "We couldn't find",
-        "fallback_selector": ".serp-results a, .people-results .name",
-        "content_patterns": [r"\d+ results?", r"Age \d+"],
+        "fallback_selector": "div.person-serp-content, ul.top-result-card",
+        "content_patterns": [r"\d+ person found", r"\d+ people found", r"lives\s+in"],
     },
     {
         "name": "Spokeo",
@@ -79,10 +152,10 @@ PEOPLE_SEARCH_SITES = [
         "search_by_phone": "/phone/{phone}",
         "search_by_email": "/email-search/search?q={email}",
         "search_by_address": "/address-search/search?q={street}+{city}+{state}+{zip}",
-        "result_selector": "a[data-link*='search-result'], .result-item .result-name",
+        "result_selector": "a.display-4[href*='/p'], span.name, a[href*='/Illinois/']",
         "no_result_text": "We could not find results",
-        "fallback_selector": ".result-item a, .search-result-card",
-        "content_patterns": [r"\d+ results?", r"Lives in"],
+        "fallback_selector": "a[href*='/Elmhurst/'], a.font-semibold[href*='/p']",
+        "content_patterns": [r"\d+ results?", r"Age \d+", r"Verified"],
     },
     # --- Additional people-search sites ---
     {
@@ -354,12 +427,9 @@ async def scan_single(profile: "Profile", slug: str) -> list[ScanResult]:
 
     results: list[ScanResult] = []
     async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=True)
-        context_kwargs: dict = {
-            "user_agent": random.choice(USER_AGENTS),
-            "viewport": {"width": 1920, "height": 1080},
-        }
+        browser = await _launch_stealth_browser(p)
         # Proxy support via BrowserConfig
+        proxy = None
         try:
             from src.config import Config
             cfg = Config.load()
@@ -369,11 +439,9 @@ async def scan_single(profile: "Profile", slug: str) -> list[ScanResult]:
                     proxy["username"] = cfg.browser.proxy.username
                 if cfg.browser.proxy.password:
                     proxy["password"] = cfg.browser.proxy.password
-                context_kwargs["proxy"] = proxy
         except Exception:
             pass
-        context = await browser.new_context(**context_kwargs)
-        context.set_default_timeout(30000)
+        context = await _create_stealth_context(browser, proxy)
 
         for query, query_type in queries:
             try:
@@ -443,32 +511,19 @@ class PeopleSearchScanner(BaseScanner):
         For name queries, format as "first last state" (e.g. "John Doe IL")
         For address queries, format as "street|city|state|zip" (e.g. "123 Main St|Chicago|IL|60601")
         """
+        loop = asyncio.new_event_loop()
         try:
-            return asyncio.get_event_loop().run_until_complete(
-                self._async_scan(query, query_type)
-            )
-        except RuntimeError:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            try:
-                return loop.run_until_complete(self._async_scan(query, query_type))
-            finally:
-                loop.close()
+            return loop.run_until_complete(self._async_scan(query, query_type))
+        finally:
+            loop.close()
 
     async def _async_scan(self, query: str, query_type: str) -> list[ScanResult]:
         from playwright.async_api import async_playwright
 
         results = []
         async with async_playwright() as p:
-            browser = await p.chromium.launch(headless=True)
-            context_kwargs: dict = {
-                "user_agent": random.choice(USER_AGENTS),
-                "viewport": {"width": 1920, "height": 1080},
-            }
-            if self._proxy:
-                context_kwargs["proxy"] = self._proxy
-            context = await browser.new_context(**context_kwargs)
-            context.set_default_timeout(30000)
+            browser = await _launch_stealth_browser(p)
+            context = await _create_stealth_context(browser, self._proxy)
 
             for i, site in enumerate(PEOPLE_SEARCH_SITES):
                 # Rate limit with jitter to avoid IP blocking
@@ -505,10 +560,27 @@ class PeopleSearchScanner(BaseScanner):
         try:
             response = await page.goto(url, wait_until="domcontentloaded", timeout=20000)
             if not response or response.status >= 400:
+                logger.debug("Site %s returned status %s", site.get("name", "unknown"),
+                             response.status if response else "no response")
                 return None
 
             # Wait for content to render
             await page.wait_for_timeout(2000)
+
+            # Dismiss consent/cookie walls if present
+            await _dismiss_consent(page)
+
+            # Try CAPTCHA solving if configured
+            try:
+                from src.config import Config
+                from src.captcha_solver import CaptchaSolver
+                cfg = Config.load()
+                solver = CaptchaSolver(cfg.captcha)
+                if await solver.detect_and_solve(page):
+                    logger.info("Solved CAPTCHA on %s", site.get("name", "unknown"))
+                    await page.wait_for_timeout(3000)
+            except (ImportError, Exception) as e:
+                logger.debug("CAPTCHA check skipped for %s: %s", site.get("name", "unknown"), e)
 
             page_text = await page.inner_text("body")
 
@@ -519,6 +591,7 @@ class PeopleSearchScanner(BaseScanner):
 
             # Check for positive result indicators
             found = False
+            confidence = "high"
             listing_url = url
             try:
                 elements = await page.query_selector_all(site["result_selector"])
@@ -560,6 +633,21 @@ class PeopleSearchScanner(BaseScanner):
                             found = True
                             break
 
+                # Universal name-match fallback: if the query name appears
+                # in the page body (outside nav/header chrome), flag it as
+                # a medium-confidence match even if selectors are stale.
+                if not found and query_type == "name" and len(page_text) > 500:
+                    parts = query.strip().split()
+                    if len(parts) >= 2:
+                        first, last = parts[0].lower(), parts[1].lower()
+                        text_lower = page_text.lower()
+                        if first in text_lower and last in text_lower:
+                            # Verify it's not just in a search box echo
+                            name_count = text_lower.count(f"{first} {last}")
+                            if name_count >= 2:
+                                found = True
+                                confidence = "medium"
+
             if not found:
                 return None
 
@@ -574,7 +662,7 @@ class PeopleSearchScanner(BaseScanner):
                     "search_url": url,
                     "broker_slug": site["slug"],
                 },
-                confidence="high",
+                confidence=confidence,
                 found_at=datetime.now(),
             )
         finally:

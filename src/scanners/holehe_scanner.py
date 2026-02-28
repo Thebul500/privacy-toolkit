@@ -25,15 +25,11 @@ class HoleheScanner(BaseScanner):
             return False
 
     def scan(self, query: str, query_type: str = "email") -> list[ScanResult]:
+        loop = asyncio.new_event_loop()
         try:
-            return asyncio.get_event_loop().run_until_complete(self._async_scan(query))
-        except RuntimeError:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            try:
-                return loop.run_until_complete(self._async_scan(query))
-            finally:
-                loop.close()
+            return loop.run_until_complete(self._async_scan(query))
+        finally:
+            loop.close()
 
     async def _async_scan(self, email: str) -> list[ScanResult]:
         try:
