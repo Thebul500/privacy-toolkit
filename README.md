@@ -47,10 +47,14 @@ Privacy Toolkit gives you the same capabilities as paid services like DeleteMe (
 - **40 service deletion guides** — step-by-step instructions for Facebook, Google, LinkedIn, Steam, and more
 
 ### Anti-Detection
+- **Stealth browser** — playwright-stealth patches with `--disable-blink-features=AutomationControlled` to bypass headless detection
 - **User-Agent rotation** — 10 realistic browser fingerprints rotated per request
+- **Fingerprint randomization** — randomized viewport, locale, and timezone per session
+- **Consent wall dismissal** — auto-clicks cookie banners and "Continue to Results" gates
 - **Request jitter** — randomized delays to avoid rate-limiting and fingerprinting
 - **Proxy support** — HTTP and SOCKS5 proxy passthrough for all Playwright operations
 - **Fallback CSS selectors** — secondary selectors on key broker sites when primary selectors break
+- **Universal name matching** — content-based fallback detects listings even when CSS selectors are stale
 
 ### Monitoring & Verification
 - **Post-removal verification** — automated re-scanning of brokers to confirm deletion
@@ -337,6 +341,32 @@ password: "literal-value"         # Used as-is
 password: "${SMTP_PASSWORD}"      # Resolved from environment variable
 password: ""                      # Auto-fallback to env var by convention
 ```
+
+---
+
+## Optional APIs
+
+Privacy Toolkit works fully out of the box with no paid services. The core scanning, stealth browser, consent wall dismissal, name-match detection, and CCPA/GDPR email removal all work for free. Optional paid APIs extend coverage:
+
+| API | What It Does | Cost | Required? |
+|-----|-------------|------|-----------|
+| **None** | Stealth Playwright scans 24 broker sites, sends CCPA emails via SMTP | Free | Default |
+| **HIBP** | Unlocks paste search and removes rate limits on breach checks | $3.50/mo | No — free tier works for basic breach checks |
+| **2captcha** | Solves reCAPTCHA v2 and hCaptcha on broker opt-out forms | ~$3/1000 solves | No — most sites don't require CAPTCHA for search |
+| **Capsolver** | Alternative CAPTCHA provider, same capabilities as 2captcha | ~$2-3/1000 solves | No — alternative to 2captcha |
+| **Residential Proxy** | Bypasses Cloudflare bot detection on ~13 protected sites | $8-15/GB | No — the 11 unprotected sites cover the major brokers |
+
+### What works without any API keys
+
+- Scans **Whitepages, Spokeo, IDCrawl, Intelius, ThatsThem, Radaris, BeenVerified** and more
+- Sends **CCPA/GDPR deletion emails** to all 78 brokers via your SMTP
+- **Automated form opt-outs** via Playwright on sites without CAPTCHA
+- **Post-removal verification** rescans to confirm deletion
+- **Privacy score**, PDF reports, Signal/webhook notifications
+
+### Sites blocked without residential proxy
+
+FastPeopleSearch, TruePeopleSearch, PeopleFinders, Nuwber, USPhoneBook, CyberBackgroundChecks, SearchPeopleFree, FamilyTreeNow, AdvancedBackgroundChecks, SmartBackgroundChecks, VoterRecords, CocoFinder, and USA People Search use Cloudflare bot protection that returns 403 to datacenter IPs. A residential proxy ($8-15/GB) would unlock these.
 
 ---
 
