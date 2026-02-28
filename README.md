@@ -3,7 +3,7 @@
 [![CI](https://github.com/Thebul500/privacy-toolkit/actions/workflows/ci.yml/badge.svg)](https://github.com/Thebul500/privacy-toolkit/actions/workflows/ci.yml)
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-256%20passing-brightgreen.svg)](#testing)
+[![Tests](https://img.shields.io/badge/tests-300%20passing-brightgreen.svg)](#testing)
 
 **Open-source personal data removal platform.** Discover your digital footprint across 78 data brokers and people-search sites, send legally-compliant CCPA/GDPR deletion requests, and track removal progress with automated verification and re-listing detection.
 
@@ -34,7 +34,7 @@ Privacy Toolkit gives you the same capabilities as paid services like DeleteMe (
 
 ### Discovery & Scanning
 - **Multi-vector scanning** — emails, usernames, phone numbers, and addresses across data brokers, breach databases, and social platforms
-- **7 integrated scanners** — HIBP, Holehe, Sherlock, Maigret, PhoneInfoga, PeopleSearch (Playwright), SpiderFoot
+- **7 integrated scanners** — HIBP, Holehe, Sherlock, Maigret, PhoneInfoga, PeopleSearch (stealth Playwright), SpiderFoot
 - **Account discovery** — find accounts linked to your identity with interactive removal guidance
 - **Breach exposure reports** — aggregate breach data with risk assessment (HIGH/MEDIUM/LOW)
 - **Result deduplication** — unique index prevents duplicate findings across repeated scans
@@ -164,7 +164,7 @@ privacy-toolkit report -p myname
 | **Sherlock** | Username presence on 300+ sites | Username | sherlock-project |
 | **Maigret** | Advanced username OSINT on 2500+ sites | Username | maigret |
 | **PhoneInfoga** | Phone number carrier and location intel | Phone | phoneinfoga |
-| **PeopleSearch** | Data broker profile listings | Name, phone, email, address | Playwright + Chromium |
+| **PeopleSearch** | Data broker profile listings (24 sites) | Name, phone, email, address | Stealth Playwright + Chromium |
 | **SpiderFoot** | Full OSINT framework (optional) | Any | Docker container |
 
 ---
@@ -473,7 +473,7 @@ privacy-toolkit/
 │   │   ├── sherlock_scanner.py
 │   │   ├── maigret_scanner.py
 │   │   ├── phoneinfoga_scanner.py
-│   │   └── people_search_scanner.py  # 25+ sites, fallback selectors
+│   │   └── people_search_scanner.py  # 24 sites, stealth browser, consent dismissal
 │   ├── removers/               # Email + form removal engines
 │   │   ├── email_remover.py    # SMTP with response classification
 │   │   └── form_remover.py     # Playwright with CAPTCHA support
@@ -483,7 +483,7 @@ privacy-toolkit/
 ├── guides/                     # 40 service deletion guides
 ├── templates/                  # Legal email templates (CCPA, GDPR)
 ├── config/                     # Configuration files
-├── tests/                      # 256 pytest tests
+├── tests/                      # 300 pytest tests
 ├── .github/workflows/          # CI, security scanning, auto-deploy
 ├── Dockerfile
 ├── docker-compose.yml
@@ -500,7 +500,7 @@ Every push triggers 4 parallel jobs:
 
 | Job | What It Checks |
 |-----|---------------|
-| **test** | Ruff linting, 256 pytest tests, syntax validation |
+| **test** | Ruff linting, 300 pytest tests, syntax validation |
 | **validate-brokers** | YAML schema validation for all 78 broker definitions |
 | **validate-guides** | YAML schema validation for all 40 deletion guides |
 | **security-sast** | Semgrep (OWASP Top 10 + Python rules) + Bandit (HIGH severity gate) |
@@ -529,7 +529,7 @@ pytest tests/test_improvements.py -v
 pytest tests/test_url_discovery.py -v
 ```
 
-**256 tests** covering:
+**300 tests** covering:
 - Database operations, dedup, score history, schema migrations
 - Authentication (bcrypt, sessions, expiry, CSRF)
 - Scanner integrations (mocked external APIs)
@@ -547,13 +547,13 @@ pytest tests/test_url_discovery.py -v
 
 Planned improvements based on competitive analysis against enterprise tools:
 
-- [ ] **Re-listing auto-resubmission** — automatically resend removal requests when brokers re-add data (like Incogni's 60-day cycle)
-- [ ] **Broker compliance scoring** — track response rates per broker to prioritize targets (like Incogni's severity ratings)
-- [ ] **REST API** — full programmatic access for integration with external tools and automation platforms
+- [x] **Re-listing auto-resubmission** — automatically resend removal requests when brokers re-add data
+- [x] **Broker compliance scoring** — track response rates per broker to prioritize targets
+- [x] **REST API** — 17 endpoints for full programmatic access
 - [ ] **Automated response routing** — parse broker email replies and auto-transition removal status
 - [ ] **Before/after screenshot evidence** — capture listing screenshots during scan and verification for removal proof (like Optery)
 - [ ] **Compliance report generator** — produce legal-ready PDF documenting all requests, responses, and timelines
-- [ ] **Notification digest** — periodic summary of removals confirmed, scores changed, and new exposures found
+- [x] **Notification digest** — periodic summary of removals confirmed, scores changed, and new exposures found
 - [ ] **Threat-model prioritization** — weight removal urgency by data sensitivity and user risk profile (like Kanary)
 - [ ] **Search engine cache removal** — request removal of cached listings from Google, Bing after broker deletion confirmed
 - [ ] **Data visualization** — score history charts, exposure heatmaps, and broker status breakdowns on the dashboard
@@ -579,7 +579,7 @@ Planned improvements based on competitive analysis against enterprise tools:
 | Webhook notifications | Yes | No | No | No | No |
 | Open source | Yes | No | No | No | No |
 | Self-hosted | Yes | No | No | No | No |
-| API access | Partial | No | No | No | No |
+| API access | Yes (17 endpoints) | No | No | No | No |
 
 ---
 
