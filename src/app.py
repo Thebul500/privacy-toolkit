@@ -140,7 +140,7 @@ async def dashboard(request: Request):
         except Exception as e:
             logger.warning("Failed to calculate privacy score for %s: %s", score_profile, e)
 
-    return templates.TemplateResponse("dashboard.html", _ctx(
+    return templates.TemplateResponse(request, "dashboard.html", _ctx(
         request,
         active="dashboard",
         stats={
@@ -171,7 +171,7 @@ async def profiles_page(request: Request, message: Optional[str] = None,
             logger.warning("Failed to load profile %s: %s", name, e)
             loaded.append(Profile(name=name))
 
-    return templates.TemplateResponse("profiles.html", _ctx(
+    return templates.TemplateResponse(request, "profiles.html", _ctx(
         request,
         active="profiles",
         profiles=loaded,
@@ -235,7 +235,7 @@ async def profile_detail(request: Request, name: str):
     scans = db.get_scans(profile=name, limit=20)
     removals = db.get_removals(profile=name)
 
-    return templates.TemplateResponse("profile_detail.html", _ctx(
+    return templates.TemplateResponse(request, "profile_detail.html", _ctx(
         request,
         active="profiles",
         profile=profile,
@@ -250,7 +250,7 @@ async def scans_page(request: Request, message: Optional[str] = None):
     scans = db.get_scans(limit=100)
     active = [t for t in task_manager.list_tasks() if t.status == TaskStatus.RUNNING]
 
-    return templates.TemplateResponse("scans.html", _ctx(
+    return templates.TemplateResponse(request, "scans.html", _ctx(
         request,
         active="scans",
         scans=scans,
@@ -374,7 +374,7 @@ async def scans_active(request: Request):
 @app.get("/accounts", response_class=HTMLResponse)
 async def accounts_page(request: Request):
     """Accounts discovery page."""
-    return templates.TemplateResponse("accounts.html", _ctx(
+    return templates.TemplateResponse(request, "accounts.html", _ctx(
         request,
         active="accounts",
     ))
@@ -388,7 +388,7 @@ async def accounts_search(request: Request, query: str = Form(...), search_type:
 
     if search_type == "email":
         if "@" not in query:
-            return templates.TemplateResponse("accounts_results.html", _ctx(
+            return templates.TemplateResponse(request, "accounts_results.html", _ctx(
                 request,
                 results=[],
                 search_type=search_type,
@@ -529,7 +529,7 @@ async def accounts_search(request: Request, query: str = Form(...), search_type:
     if results and error:
         error = None
 
-    return templates.TemplateResponse("accounts_results.html", _ctx(
+    return templates.TemplateResponse(request, "accounts_results.html", _ctx(
         request,
         results=results,
         search_type=search_type,
@@ -554,7 +554,7 @@ async def removals_page(request: Request, status: Optional[str] = None,
     email_brokers = [b for b in all_brokers if b.email_method]
     form_brokers = [b for b in all_brokers if b.form_method]
 
-    return templates.TemplateResponse("removals.html", _ctx(
+    return templates.TemplateResponse(request, "removals.html", _ctx(
         request,
         active="removals",
         removals=removals,
@@ -715,7 +715,7 @@ async def brokers_page(request: Request, priority: Optional[str] = None):
     # Build compliance lookup for template
     compliance = {c["broker_slug"]: c for c in db.get_broker_compliance()}
 
-    return templates.TemplateResponse("brokers.html", _ctx(
+    return templates.TemplateResponse(request, "brokers.html", _ctx(
         request,
         active="brokers",
         brokers=brokers,
@@ -813,7 +813,7 @@ async def download_pdf(report_type: str, profile: Optional[str] = None):
 async def activity_page(request: Request):
     entries = db.get_audit_log(limit=200)
 
-    return templates.TemplateResponse("activity.html", _ctx(
+    return templates.TemplateResponse(request, "activity.html", _ctx(
         request,
         active="activity",
         entries=entries,
@@ -836,7 +836,7 @@ async def setup_page(request: Request, step: int = 1):
             smtp_username = cfg.smtp.username
         except Exception:
             pass
-    return templates.TemplateResponse("setup.html", _ctx(
+    return templates.TemplateResponse(request, "setup.html", _ctx(
         request,
         active="setup",
         step=step,
@@ -948,7 +948,7 @@ async def setup_complete():
 
 @app.get("/login", response_class=HTMLResponse)
 async def login_page(request: Request, error: Optional[str] = None):
-    return templates.TemplateResponse("login.html", _ctx(
+    return templates.TemplateResponse(request, "login.html", _ctx(
         request,
         active="",
         error=error,
